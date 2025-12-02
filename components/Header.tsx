@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Database, RefreshCw } from 'lucide-react';
 import { InstallPWA } from './InstallPWA';
@@ -21,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCo
             <h1 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight leading-none">FinanceApp</h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium uppercase tracking-wide">Secure Local DB</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium uppercase tracking-wide">Local DB</p>
             </div>
           </div>
         </div>

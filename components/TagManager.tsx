@@ -1,7 +1,7 @@
-
 import React, { useState, useMemo } from 'react';
 import { MegaTransaction } from '../types';
-import { Tag, Calendar, Calculator, Folder, Wallet, ChevronDown } from 'lucide-react';
+import { Tag, Calendar, Calculator, Folder, Wallet } from 'lucide-react';
+import { CustomSelect } from './CustomSelect';
 
 interface TagManagerProps {
   transactions: MegaTransaction[];
@@ -72,61 +72,43 @@ export const TagManager: React.FC<TagManagerProps> = ({ transactions, years }) =
     return map;
   }, [filteredTransactions]);
 
-  // Styling helper
-  const selectContainerClass = "relative group";
-  const selectClass = "w-full appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-3 px-4 pr-10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all cursor-pointer text-sm shadow-sm hover:border-indigo-200";
-  const iconClass = "absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors";
-  const labelClass = "text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1 mb-1.5 block";
-
   return (
     <div className="flex flex-col gap-6">
       {/* Filters Section */}
-      <div className="bg-white/80 backdrop-blur-xl p-6 rounded-[2rem] shadow-sm border border-white/60">
-        <div className="flex items-center gap-3 text-slate-800 font-bold text-lg mb-6">
-           <div className="bg-indigo-50 p-2 rounded-xl text-indigo-600">
-              <Tag size={20} />
-           </div>
-           Analisi Tag
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center gap-2 text-slate-500 font-medium pb-4 border-b border-slate-100 mb-4">
+          <Tag size={20} />
+          <span>Filtri Analisi Tag</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Year Selector */}
             <div>
-                <label className={labelClass}>Anno</label>
-                <div className={selectContainerClass}>
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => {
-                           setSelectedYear(parseInt(e.target.value));
-                           setSelectedTag(''); // Reset tag when year changes
-                        }}
-                        className={selectClass}
-                    >
-                        {years.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                        ))}
-                    </select>
-                    <ChevronDown size={16} className={iconClass} />
-                </div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase">Anno</label>
+                <CustomSelect
+                  value={selectedYear}
+                  onChange={(val) => {
+                     setSelectedYear(val);
+                     setSelectedTag(''); // Reset tag
+                  }}
+                  options={years.map(y => ({ value: y, label: y.toString() }))}
+                  icon={<Calendar size={16} />}
+                />
             </div>
 
             {/* Tag Selector */}
             <div>
-                <label className={labelClass}>Tag Selezionato</label>
-                <div className={selectContainerClass}>
-                    <select
-                        value={selectedTag}
-                        onChange={(e) => setSelectedTag(e.target.value)}
-                        disabled={availableTags.length === 0}
-                        className={`${selectClass} ${availableTags.length === 0 ? 'bg-slate-50 text-slate-400' : ''}`}
-                    >
-                        <option value="">{availableTags.length === 0 ? 'Nessun tag disponibile' : '-- Seleziona un Tag --'}</option>
-                        {availableTags.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                    <Tag size={16} className={iconClass} />
-                </div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase">Seleziona Tag</label>
+                <CustomSelect
+                  value={selectedTag}
+                  onChange={setSelectedTag}
+                  options={[
+                    { value: '', label: availableTags.length === 0 ? 'Nessun tag disponibile' : '-- Seleziona un Tag --' },
+                    ...availableTags.map(t => ({ value: t, label: t }))
+                  ]}
+                  disabled={availableTags.length === 0}
+                  icon={<Tag size={16} />}
+                />
             </div>
         </div>
       </div>
@@ -134,43 +116,42 @@ export const TagManager: React.FC<TagManagerProps> = ({ transactions, years }) =
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Year Total Tagged Card */}
-        <div className="bg-slate-800 rounded-[2rem] p-6 text-white shadow-lg shadow-slate-900/10 flex items-center justify-between border border-slate-700 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-700/50 rounded-full blur-3xl -translate-y-10 translate-x-10"></div>
-            <div className="relative z-10">
-                <h2 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
+        <div className="bg-slate-800 rounded-xl p-6 text-white shadow-sm flex items-center justify-between border border-slate-700">
+            <div>
+                <h2 className="text-slate-300 font-medium mb-1 flex items-center gap-2">
                     Totale Tag {selectedYear}
                 </h2>
-                <p className="text-3xl font-bold font-mono tracking-tight">
+                <p className="text-2xl font-bold font-mono">
                     CHF {yearTaggedTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-2 font-medium">
+                <p className="text-xs text-slate-400 mt-1">
                     Somma di tutti i movimenti taggati
                 </p>
             </div>
-            <div className="bg-slate-700/50 p-3 rounded-2xl relative z-10 border border-slate-600">
+            <div className="bg-slate-700 p-3 rounded-full">
                 <Wallet size={24} className="text-slate-300" />
             </div>
         </div>
 
         {/* Tag Total Card (Only if tag selected) */}
         {selectedTag ? (
-            <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-between border border-indigo-500 relative overflow-hidden">
-                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl translate-y-10 -translate-x-10"></div>
-                <div className="relative z-10">
-                    <h2 className="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
-                        Totale per Tag <span className="text-white bg-white/20 px-2 py-0.5 rounded text-[10px]">{selectedTag}</span>
+            <div className="bg-indigo-600 rounded-xl p-6 text-white shadow-sm flex items-center justify-between border border-indigo-500">
+                <div>
+                    <h2 className="text-indigo-100 font-medium mb-1 flex items-center gap-2">
+                        Totale per Tag: 
+                        <span className="font-bold text-white bg-indigo-500/50 px-2 py-0.5 rounded text-sm">{selectedTag}</span>
                     </h2>
-                    <p className="text-3xl font-bold font-mono tracking-tight">
+                    <p className="text-2xl font-bold font-mono">
                         CHF {tagTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-2xl relative z-10 backdrop-blur-sm">
+                <div className="bg-white/20 p-3 rounded-full">
                     <Calculator size={24} />
                 </div>
             </div>
         ) : (
-            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-6 flex items-center justify-center text-slate-400">
-                <span className="text-sm font-medium">Seleziona un tag per i dettagli</span>
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-6 flex items-center justify-center text-slate-400">
+                <span className="text-sm">Seleziona un tag per vedere il totale specifico</span>
             </div>
         )}
       </div>
@@ -178,22 +159,22 @@ export const TagManager: React.FC<TagManagerProps> = ({ transactions, years }) =
       {selectedTag && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Col: Breakdown Breakdown */}
-            <div className="lg:col-span-1 bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col max-h-[600px]">
-                <div className="p-5 border-b border-slate-50 bg-slate-50/50 font-bold text-slate-700 flex items-center gap-2 shrink-0">
-                    <Folder size={18} className="text-indigo-500" />
-                    Suddivisione
+            <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col max-h-[600px]">
+                <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700 flex items-center gap-2 shrink-0">
+                    <Folder size={18} />
+                    Suddivisione Categorie
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-                    <div className="flex flex-col gap-2">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="divide-y divide-slate-100">
                         {Array.from(breakdown.entries()).map(([catName, data]) => (
-                            <div key={catName} className="p-4 rounded-xl bg-white border border-slate-100 hover:border-indigo-100 transition-colors">
+                            <div key={catName} className="p-4">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="font-bold text-slate-700 text-sm">{catName}</span>
-                                    <span className={`font-mono font-bold text-sm ${data.total < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    <span className="font-medium text-slate-800">{catName}</span>
+                                    <span className={`font-mono font-bold ${data.total < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                                         {data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                     </span>
                                 </div>
-                                <div className="pl-3 space-y-1 border-l-2 border-slate-100 ml-1">
+                                <div className="pl-4 space-y-1.5 border-l-2 border-slate-100 ml-1">
                                     {Array.from(data.subcategories.entries()).map(([subName, amount]) => (
                                         <div key={subName} className="flex justify-between items-center text-xs text-slate-500">
                                             <span>{subName}</span>
@@ -208,43 +189,39 @@ export const TagManager: React.FC<TagManagerProps> = ({ transactions, years }) =
             </div>
 
             {/* Right Col: Transactions List (Read Only) */}
-            <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col max-h-[600px]">
-                 <div className="p-5 border-b border-slate-50 bg-slate-50/50 font-bold text-slate-700 shrink-0 flex justify-between items-center">
-                    <span>Dettaglio Movimenti</span>
-                    <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs">{filteredTransactions.length}</span>
+            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col max-h-[600px]">
+                 <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700 shrink-0">
+                    Dettaglio Movimenti ({filteredTransactions.length})
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <table className="w-full text-left text-sm">
-                         <thead className="bg-white sticky top-0 z-10 shadow-sm text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <tr>
-                                <th className="px-5 py-4">Data</th>
-                                <th className="px-5 py-4">Conto</th>
-                                <th className="px-5 py-4">Categoria</th>
-                                <th className="px-5 py-4">Sottocategoria</th>
-                                <th className="px-5 py-4">Note</th>
-                                <th className="px-5 py-4 text-right">Importo (CHF)</th>
+                                <th className="px-4 py-3">Data</th>
+                                <th className="px-4 py-3">Conto</th>
+                                <th className="px-4 py-3">Categoria</th>
+                                <th className="px-4 py-3">Sottocategoria</th>
+                                <th className="px-4 py-3">Note</th>
+                                <th className="px-4 py-3 text-right">Importo (CHF)</th>
                             </tr>
                          </thead>
-                         <tbody className="divide-y divide-slate-50">
+                         <tbody className="divide-y divide-slate-100">
                             {filteredTransactions.map(tx => (
-                                <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-5 py-3 whitespace-nowrap text-slate-600 font-mono text-xs">
+                                <tr key={tx.id} className="hover:bg-slate-50">
+                                    <td className="px-4 py-2 whitespace-nowrap text-slate-600 font-mono text-xs">
                                         {new Date(tx.date).toLocaleDateString()}
                                     </td>
-                                    <td className="px-5 py-3 whitespace-nowrap text-slate-600">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                                            {tx.account_name}
-                                        </div>
+                                    <td className="px-4 py-2 whitespace-nowrap text-slate-600">
+                                        <span className="px-2 py-0.5 bg-slate-100 rounded text-xs">{tx.account_name}</span>
                                     </td>
-                                    <td className="px-5 py-3 whitespace-nowrap text-slate-800 font-medium">{tx.category_name}</td>
-                                    <td className="px-5 py-3 whitespace-nowrap text-slate-500 text-xs">
+                                    <td className="px-4 py-2 whitespace-nowrap text-slate-600">{tx.category_name}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-slate-500 text-xs">
                                         {tx.subcategory_name !== '-' ? tx.subcategory_name : ''}
                                     </td>
-                                    <td className="px-5 py-3 text-slate-400 text-xs truncate max-w-[150px]" title={tx.note}>
+                                    <td className="px-4 py-2 text-slate-500 text-xs truncate max-w-[150px]" title={tx.note}>
                                         {tx.note}
                                     </td>
-                                    <td className={`px-5 py-3 whitespace-nowrap text-right font-mono font-bold ${tx.amount_base < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    <td className={`px-4 py-2 whitespace-nowrap text-right font-mono font-medium ${tx.amount_base < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                                         {tx.amount_base.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>

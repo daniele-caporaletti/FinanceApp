@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { DbAccount, MegaTransaction } from '../types';
 import { addAccount, toggleAccountActive, toggleAccountSelect } from '../services/supabaseService';
-import { Plus, Check, AlertTriangle, Eye, EyeOff, CheckSquare, Square, Wallet, MoreVertical } from 'lucide-react';
+import { Plus, Check, AlertTriangle, Eye, EyeOff, CheckSquare, Square, Wallet } from 'lucide-react';
 
 interface AccountManagerProps {
   accounts: DbAccount[];
@@ -52,32 +52,30 @@ export const AccountManager: React.FC<AccountManagerProps> = ({ accounts, transa
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+    <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-sm border border-white/60 overflow-hidden flex flex-col">
+      <div className="p-6 border-b border-slate-200/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Wallet className="text-indigo-600" /> Gestione Conti
           </h2>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Configura i tuoi wallet</p>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Gestisci i tuoi conti e monitora i saldi</p>
         </div>
         
         <div className="flex items-center gap-3">
            {/* Toggle Show Inactive */}
-           <label className="flex items-center gap-2 cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-500 select-none bg-slate-50 px-4 py-3 rounded-xl hover:bg-slate-100 transition-colors">
+           <label className="flex items-center gap-2 cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-500 select-none bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">
              <input 
                type="checkbox" 
                checked={showInactive} 
                onChange={(e) => setShowInactive(e.target.checked)}
                className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
              />
-             Inattivi
+             Mostra inattivi
            </label>
 
            <button 
              onClick={() => setIsAdding(!isAdding)}
-             className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-md active:scale-95 text-sm font-bold"
+             className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-all shadow-md active:scale-95 text-sm font-bold"
            >
              <Plus size={18} />
              <span className="hidden sm:inline">Nuovo Conto</span>
@@ -87,12 +85,12 @@ export const AccountManager: React.FC<AccountManagerProps> = ({ accounts, transa
 
       {/* Add Account Form */}
       {isAdding && (
-        <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 animate-in fade-in slide-in-from-top-2">
+        <div className="p-6 bg-indigo-50/50 border-b border-indigo-100 animate-in fade-in slide-in-from-top-2">
            <div className="max-w-2xl mx-auto">
-              <div className="flex items-start gap-3 mb-6 p-4 bg-white/60 text-amber-800 rounded-2xl border border-amber-100/50 shadow-sm">
+              <div className="flex items-start gap-3 mb-6 p-4 bg-white/60 text-amber-800 rounded-xl border border-amber-100/50 shadow-sm">
                 <AlertTriangle size={20} className="shrink-0 mt-0.5 text-amber-500" />
                 <p className="text-sm leading-relaxed">
-                  <strong>Attenzione:</strong> La creazione è permanente.
+                  <strong>Attenzione:</strong> La creazione di un conto è permanente. Una volta creato, non può essere eliminato dal database (può solo essere disattivato/nascosto). Assicurati che i dati siano corretti.
                 </p>
               </div>
 
@@ -133,69 +131,68 @@ export const AccountManager: React.FC<AccountManagerProps> = ({ accounts, transa
         </div>
       )}
 
-      {/* Accounts GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Accounts Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+              <th className="px-6 py-4">Conto</th>
+              <th className="px-6 py-4 text-center">Valuta</th>
+              <th className="px-6 py-4 text-right">Saldo</th>
+              <th className="px-6 py-4 text-center">Stato</th>
+              <th className="px-6 py-4 text-center">Visibilità</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
             {displayedAccounts.map((account) => {
               const balance = balances.get(account.id) || 0;
               return (
-                <div key={account.id} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 hover:border-indigo-100 hover:shadow-md transition-all group relative">
-                  
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-xl ${account.is_active ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-300'}`}>
-                           {account.name.charAt(0)}
-                        </div>
-                        <div>
-                           <div className={`font-bold text-lg leading-tight ${account.is_active ? 'text-slate-800' : 'text-slate-400 line-through'}`}>{account.name}</div>
-                           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{account.currency}</div>
-                        </div>
-                    </div>
-                    {/* Status Badge */}
-                    {!account.is_active && (
-                       <span className="bg-slate-100 text-slate-400 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Archiviato</span>
-                    )}
-                  </div>
-
-                  <div className={`text-3xl font-mono font-bold tracking-tight mb-6 ${balance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                    {balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </div>
-
-                  {/* Actions Bar */}
-                  <div className="flex gap-2 pt-4 border-t border-slate-50">
+                <tr key={account.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-800 text-lg">{account.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">ID: {account.id}</div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="inline-block px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-bold font-mono text-slate-600 border border-slate-200">
+                      {account.currency}
+                    </span>
+                  </td>
+                  <td className={`px-6 py-4 text-right font-mono font-bold text-lg ${balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-6 py-4 text-center">
                     <button 
                       onClick={() => toggleAccountActive(account.id, account.is_active)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
-                          account.is_active 
-                          ? 'bg-slate-50 text-slate-600 hover:bg-slate-100' 
-                          : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                      }`}
+                      className={`p-2 rounded-xl transition-all ${account.is_active ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-400 bg-slate-100 hover:bg-slate-200'}`}
+                      title={account.is_active ? "Attivo (Clicca per disattivare)" : "Inattivo (Clicca per attivare)"}
                     >
-                      {account.is_active ? <><EyeOff size={16} /> Nascondi</> : <><Eye size={16} /> Attiva</>}
+                      {account.is_active ? <Eye size={20} /> : <EyeOff size={20} />}
                     </button>
-                    
-                    <button
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                     <button
                        onClick={() => toggleAccountSelect(account.id, account.is_select)}
-                       className={`flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
-                          account.is_select 
-                          ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' 
-                          : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                       }`}
+                       className={`p-1.5 rounded-lg transition-all ${account.is_select ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-300 hover:text-slate-500'}`}
+                       title={account.is_select ? "Visibile nei filtri" : "Nascosto dai filtri"}
                      >
-                        {account.is_select ? <><CheckSquare size={16} /> Filtri ON</> : <><Square size={16} /> Filtri OFF</>}
+                        {account.is_select ? <CheckSquare size={24} /> : <Square size={24} />}
                      </button>
-                  </div>
-
-                </div>
+                  </td>
+                </tr>
               );
             })}
-            
-            {/* Empty State Card */}
             {displayedAccounts.length === 0 && (
-               <div className="col-span-full py-16 text-center text-slate-400 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
-                  <Wallet size={48} className="mx-auto mb-4 text-slate-300" />
-                  <p>Nessun conto trovato.</p>
-               </div>
+              <tr>
+                <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                   <div className="flex flex-col items-center gap-2">
+                     <Wallet size={32} className="text-slate-300" />
+                     <p>Nessun conto trovato.</p>
+                   </div>
+                </td>
+              </tr>
             )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

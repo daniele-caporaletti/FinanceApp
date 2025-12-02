@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DbAccount, DbCategory, DbSubcategory, MegaTransaction } from '../types';
 import { saveTransaction, saveTransfer, updateTransaction } from '../services/supabaseService';
 import { X, ArrowRightLeft, Repeat, Coins, Check, AlertCircle } from 'lucide-react';
+import { CustomSelect } from './CustomSelect';
 
 interface TransactionFormProps {
   accounts: DbAccount[];
@@ -214,7 +215,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="date" 
                 value={date} 
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 required
               />
             </div>
@@ -227,17 +228,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                      <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Origine (Prelievo)</span>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Conto</label>
-                        <select 
-                          value={fromAccountId} 
-                          onChange={e => setFromAccountId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
-                          required
-                        >
-                          <option value="">Seleziona Conto...</option>
-                          {activeAccounts.map(a => (
-                            <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={fromAccountId}
+                          onChange={setFromAccountId}
+                          options={activeAccounts.map(a => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+                          placeholder="Seleziona Conto..."
+                        />
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Importo (Uscita)</label>
@@ -247,11 +243,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                              step="0.01"
                              value={fromAmount}
                              onChange={e => setFromAmount(e.target.value)}
-                             className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                             className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500"
                              placeholder="0.00"
                              required
                            />
-                           <span className="absolute right-3 top-2 text-slate-400 text-sm">
+                           <span className="absolute right-3 top-2.5 text-slate-400 text-sm">
                              {getCurrency(fromAccountId)}
                            </span>
                         </div>
@@ -263,17 +259,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                      <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Destinazione (Versamento)</span>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Conto</label>
-                        <select 
-                          value={toAccountId} 
-                          onChange={e => setToAccountId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
-                          required
-                        >
-                          <option value="">Seleziona Conto...</option>
-                          {activeAccounts.map(a => (
-                            <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={toAccountId}
+                          onChange={setToAccountId}
+                          options={activeAccounts.map(a => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+                          placeholder="Seleziona Conto..."
+                        />
                      </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Importo (Entrata)</label>
@@ -283,11 +274,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                              step="0.01"
                              value={toAmount}
                              onChange={e => setToAmount(e.target.value)}
-                             className="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                             className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500"
                              placeholder="0.00"
                              required
                            />
-                           <span className="absolute right-3 top-2 text-slate-400 text-sm">
+                           <span className="absolute right-3 top-2.5 text-slate-400 text-sm">
                              {getCurrency(toAccountId)}
                            </span>
                         </div>
@@ -301,17 +292,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   {/* Account */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase">Conto</label>
-                    <select 
-                      value={accountId} 
-                      onChange={e => setAccountId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500"
-                      required
-                    >
-                      <option value="">Seleziona Conto...</option>
-                      {activeAccounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value={accountId}
+                      onChange={setAccountId}
+                      options={activeAccounts.map(a => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+                      placeholder="Seleziona Conto..."
+                    />
                   </div>
 
                   {/* Amount */}
@@ -323,11 +309,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                         step="0.01"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        className="w-full pl-3 pr-12 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full pl-3 pr-12 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500"
                         placeholder="0.00"
                         required
                       />
-                      <span className="absolute right-3 top-2 text-slate-500 font-medium">
+                      <span className="absolute right-3 top-2.5 text-slate-500 font-medium">
                         {getCurrency(accountId)}
                       </span>
                     </div>
@@ -338,36 +324,27 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                    {/* Category */}
                    <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase">Categoria</label>
-                    <select 
-                      value={categoryId} 
-                      onChange={e => {
-                        setCategoryId(e.target.value);
+                    <CustomSelect
+                      value={categoryId}
+                      onChange={(val) => {
+                        setCategoryId(val);
                         setSubcategoryId('');
                       }}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500"
-                      required
-                    >
-                      <option value="">Seleziona Categoria...</option>
-                      {categories.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
+                      options={categories.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Seleziona Categoria..."
+                    />
                   </div>
 
                   {/* Subcategory */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase">Sottocategoria</label>
-                    <select 
-                      value={subcategoryId} 
-                      onChange={e => setSubcategoryId(e.target.value)}
+                    <CustomSelect
+                      value={subcategoryId}
+                      onChange={setSubcategoryId}
+                      options={currentSubcategories.map(s => ({ value: s.id, label: s.name }))}
+                      placeholder={categoryId ? 'Nessuna Sottocategoria' : '-'}
                       disabled={!categoryId}
-                      className={`w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500 ${!categoryId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <option value="">{categoryId ? 'Nessuna Sottocategoria' : '-'}</option>
-                      {currentSubcategories.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -379,7 +356,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                       type="text" 
                       value={note}
                       onChange={e => setNote(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500"
                       placeholder="Descrizione..."
                     />
                   </div>
@@ -393,7 +370,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                         list="tags-list"
                         value={tag}
                         onChange={e => setTag(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500"
                         placeholder="Cerca o crea tag..."
                       />
                       <datalist id="tags-list">
