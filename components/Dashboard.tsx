@@ -243,27 +243,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                        
                        <td onClick={() => handleCellClick(index, 'VAR')} className="px-4 py-3 text-right cursor-pointer">
                           <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.variableExpenses !== 0 ? 'text-rose-600 group-hover:bg-rose-100/50' : 'text-slate-300'}`}>
-                            {data.variableExpenses !== 0 ? Math.floor(data.variableExpenses).toLocaleString('en-US') + '.' + data.variableExpenses.toFixed(2).split('.')[1] : '-'}
+                            {data.variableExpenses !== 0 ? data.variableExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'FIX')} className="px-4 py-3 text-right cursor-pointer">
                           <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.fixedExpenses !== 0 ? 'text-amber-600 group-hover:bg-amber-100/50' : 'text-slate-300'}`}>
-                            {data.fixedExpenses !== 0 ? Math.floor(data.fixedExpenses).toLocaleString('en-US') + '.' + data.fixedExpenses.toFixed(2).split('.')[1] : '-'}
+                            {data.fixedExpenses !== 0 ? data.fixedExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'INC')} className="px-4 py-3 text-right cursor-pointer">
                           <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.income !== 0 ? 'text-emerald-600 group-hover:bg-emerald-100/50' : 'text-slate-300'}`}>
-                            {data.income !== 0 ? `+${Math.floor(data.income).toLocaleString('en-US')}.${data.income.toFixed(2).split('.')[1]}` : '-'}
+                            {data.income !== 0 ? `+${data.income.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'WORK_ADV')} className="px-4 py-3 text-right cursor-pointer">
                           <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.workAdvances !== 0 ? 'text-blue-600 group-hover:bg-blue-100/50' : 'text-slate-300'}`}>
-                            {data.workAdvances !== 0 ? Math.floor(data.workAdvances).toLocaleString('en-US') + '.' + data.workAdvances.toFixed(2).split('.')[1] : '-'}
+                            {data.workAdvances !== 0 ? data.workAdvances.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'WORK_REIMB')} className="px-4 py-3 text-right cursor-pointer">
                           <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.workReimbursements !== 0 ? 'text-indigo-600 group-hover:bg-indigo-100/50' : 'text-slate-300'}`}>
-                            {data.workReimbursements !== 0 ? `+${Math.floor(data.workReimbursements).toLocaleString('en-US')}.${data.workReimbursements.toFixed(2).split('.')[1]}` : '-'}
+                            {data.workReimbursements !== 0 ? `+${data.workReimbursements.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                           </span>
                        </td>
                     </tr>
@@ -278,8 +278,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           {/* --- LEFT COL: Active Accounts (Table Style) --- */}
           <div className="lg:col-span-1 flex flex-col gap-4">
-              {/* Reduced height on mobile: h-[240px] */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[240px] md:h-[600px]">
+              {/* Increased height on mobile: h-[350px] */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[350px] md:h-[600px]">
                   <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                     <div>
                       <h3 className="text-base md:text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -333,8 +333,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* --- RIGHT COL: Monthly Analysis --- */}
           <div className="lg:col-span-2 flex flex-col gap-4">
-              {/* Reduced height on mobile: h-[300px] */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[300px] md:h-[600px]">
+              {/* Increased height on mobile: h-[450px] */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[450px] md:h-[600px]">
                   {/* Header with Month Selector */}
                   <div className="p-4 md:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 md:gap-4 shrink-0 bg-slate-50/50">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
