@@ -59,13 +59,19 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-              console.log('SW registered: ', registration);
-            })
-            .catch(registrationError => {
-              console.log('SW registration failed: ', registrationError);
-            });
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW registered');
+            reg.update(); // Check for updates immediately
+          }).catch(err => console.log('SW Fail', err));
+        });
+
+        // Force reload if the controller changes (new version installed)
+        // This fixes the issue where the app tries to load old cached chunks
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          window.location.reload();
+          refreshing = true;
         });
       }
     </script>
