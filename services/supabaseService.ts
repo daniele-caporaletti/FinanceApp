@@ -283,7 +283,7 @@ export const deleteInvestmentTrend = async (id: string) => {
 
 // --- Transaction & Logic Methods ---
 
-const calculateBaseAmountInCHF = async (amountOriginal: number, currency: string, date: string): Promise<number> => {
+export const calculateBaseAmountInCHF = async (amountOriginal: number, currency: string, date: string): Promise<number> => {
   let calculatedAmount = amountOriginal;
 
   if (currency !== 'CHF') {

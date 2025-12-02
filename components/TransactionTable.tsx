@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { MegaTransaction } from '../types';
-import { AlertCircle, Check, X, Trash2, Pencil, Wallet, Repeat } from 'lucide-react';
+import { AlertCircle, Trash2, Pencil, Wallet, Repeat, BarChart3, Ban, Info } from 'lucide-react';
 import { formatCurrency, formatCurrencyWithSign, formatDateShort } from '../utils';
+import { InfoModal } from './InfoModal';
 
 interface TransactionTableProps {
   transactions: MegaTransaction[];
@@ -77,6 +78,18 @@ const MobileTransactionCard: React.FC<MobileCardProps> = ({
                      "{tx.note}"
                    </p>
                  )}
+                 <div className="flex gap-2 mt-1">
+                    {tx.context && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${tx.context === 'work' ? 'bg-amber-50 border-amber-100 text-amber-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                           {tx.context === 'work' ? 'Lavoro' : 'Personale'}
+                        </span>
+                    )}
+                    {!tx.analytics_included && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-50 border-slate-100 text-slate-400 flex items-center gap-1">
+                           <Ban size={10} /> No Analisi
+                        </span>
+                    )}
+                 </div>
               </div>
               
               <div className="flex gap-2">
@@ -106,6 +119,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   onDelete
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -130,6 +144,32 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
 
   return (
     <>
+      <InfoModal
+        isOpen={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title="Legenda Colonne"
+      >
+        <p className="mb-2">Spiegazione dei simboli nella colonna <strong>Info</strong>:</p>
+        <ul className="space-y-3">
+           <li className="flex items-start gap-2">
+              <span className="bg-amber-100 text-amber-700 px-1.5 rounded text-[10px] font-bold uppercase mt-0.5">W</span>
+              <span><strong>Work (Lavoro):</strong> Spese o entrate legate all'attività lavorativa (es. anticipi, rimborsi).</span>
+           </li>
+           <li className="flex items-start gap-2">
+              <span className="bg-slate-100 text-slate-500 px-1.5 rounded text-[10px] font-bold uppercase mt-0.5">P</span>
+              <span><strong>Personal (Personale):</strong> Spese o entrate personali standard.</span>
+           </li>
+           <li className="flex items-start gap-2">
+              <Repeat size={14} className="text-purple-500 mt-0.5" />
+              <span><strong>Ricorrente:</strong> Movimenti che si ripetono (es. abbonamenti, affitto).</span>
+           </li>
+           <li className="flex items-start gap-2">
+              <Ban size={14} className="text-slate-300 mt-0.5" />
+              <span><strong>Escluso Analisi:</strong> Movimenti che non vengono contati nei grafici (es. giroconti).</span>
+           </li>
+        </ul>
+      </InfoModal>
+
       {/* --- DESKTOP TABLE VIEW --- */}
       <div className="hidden md:flex w-full bg-white/80 backdrop-blur-md rounded-3xl shadow-sm border border-white/60 overflow-hidden flex-col h-[calc(100vh-16rem)]">
         <div className="overflow-auto custom-scrollbar flex-1 relative">
@@ -144,8 +184,14 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] w-64">Note</th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px]">Tag</th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-right border-l border-slate-200/50">CHF Base</th>
-                <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-center">Analisi</th>
-                <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px]">Info</th>
+                <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-center">
+                    <button 
+                      onClick={() => setShowInfoModal(true)}
+                      className="flex items-center justify-center gap-1 hover:text-indigo-600 transition-colors"
+                    >
+                       Info <Info size={12} />
+                    </button>
+                </th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-center">Azioni</th>
               </tr>
             </thead>
@@ -171,20 +217,33 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                   <td className={`px-5 py-3 text-right font-mono font-bold whitespace-nowrap border-l border-slate-100 ${tx.amount_base < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                     {formatCurrency(tx.amount_base)}
                   </td>
-                  <td className="px-5 py-3 text-center">
-                    {tx.analytics_included 
-                      ? <div className="w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto"><Check size={12} /></div> 
-                      : <div className="w-5 h-5 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto"><X size={12} /></div>}
-                  </td>
                   
-                  {/* Info Column: Context + Recurrence */}
-                  <td className="px-5 py-3 text-slate-500 text-xs">
-                    <div className="flex items-center gap-1.5">
-                       {tx.context ? <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${tx.context === 'work' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{tx.context}</span> : '-'}
+                  {/* Info Column */}
+                  <td className="px-5 py-3 text-slate-500 text-xs overflow-visible">
+                    <div className="flex items-center justify-center gap-2">
+                       {/* Context Badge */}
+                       {tx.context ? (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tx.context === 'work' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {tx.context === 'work' ? 'W' : 'P'}
+                          </span>
+                       ) : null}
+                       
+                       {/* Recurrence Icon */}
                        {tx.recurrence === 'recurring' && (
-                         <span className="p-1 bg-purple-50 text-purple-600 rounded-full" title="Ricorrente">
-                           <Repeat size={12} />
-                         </span>
+                           <span className="text-purple-500">
+                             <Repeat size={14} />
+                           </span>
+                       )}
+
+                       {/* Analytics Status Icon */}
+                       {tx.analytics_included ? (
+                          <span className="text-indigo-500">
+                             <BarChart3 size={14} />
+                          </span>
+                       ) : (
+                          <span className="text-slate-300">
+                             <Ban size={14} />
+                          </span>
                        )}
                     </div>
                   </td>

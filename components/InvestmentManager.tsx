@@ -2,10 +2,11 @@
 import React, { useState, useMemo } from 'react';
 import { DbInvestment, DbInvestmentTrend } from '../types';
 import { addInvestment, addInvestmentTrend, deleteInvestmentTrend, updateInvestment } from '../services/supabaseService';
-import { TrendingUp, Plus, ShieldCheck, PieChart, Coins, X, Trash2, ArrowRight, Pencil } from 'lucide-react';
+import { TrendingUp, Plus, ShieldCheck, PieChart, Coins, X, Trash2, ArrowRight, Pencil, Info } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 import { formatCurrency, MONTHS } from '../utils';
 import { ConfirmModal } from './ConfirmModal';
+import { InfoModal } from './InfoModal';
 
 interface InvestmentManagerProps {
   investments: DbInvestment[];
@@ -39,6 +40,9 @@ export const InvestmentManager: React.FC<InvestmentManagerProps> = ({ investment
   const [trendYear, setTrendYear] = useState(new Date().getFullYear());
   const [trendValue, setTrendValue] = useState('');
   const [trendCashFlow, setTrendCashFlow] = useState('');
+
+  // Info Modal State
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   // Delete State
   const [trendToDeleteId, setTrendToDeleteId] = useState<string | null>(null);
@@ -240,7 +244,7 @@ export const InvestmentManager: React.FC<InvestmentManagerProps> = ({ investment
         {displayedInvestments.length === 0 ? (
            <div className="col-span-full py-12 flex flex-col items-center justify-center text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl">
               <TrendingUp size={48} className="mb-2 opacity-20" />
-              <p>Nessun investimento trovato in questa sezione.</p>
+              <p>Nessuna investimento trovato in questa sezione.</p>
            </div>
         ) : (
           displayedInvestments.map(inv => {
@@ -303,7 +307,8 @@ export const InvestmentManager: React.FC<InvestmentManagerProps> = ({ investment
       {/* --- Detail Modal: History Table --- */}
       {selectedInvestment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden relative">
+               
                {/* Detail Header */}
                <div className="p-4 md:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-start">
                    <div>
@@ -322,34 +327,45 @@ export const InvestmentManager: React.FC<InvestmentManagerProps> = ({ investment
                        </div>
                        {selectedInvestment.note && <p className="text-sm text-slate-500 mt-1 italic">{selectedInvestment.note}</p>}
                    </div>
-                   <button onClick={() => setSelectedInvestmentId(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                   <button onClick={() => { setSelectedInvestmentId(null); setShowInfoModal(false); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                       <X size={24} className="text-slate-500" />
                    </button>
                </div>
 
-               {/* Stats Summary Bar */}
+               {/* Stats Summary Bar & Info Toggle */}
                {selectedInvestmentTrends.length > 0 && (
-                   <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-white border-b border-slate-100">
-                       <div>
-                           <div className="text-[10px] uppercase text-slate-400 font-bold">Valore Attuale</div>
-                           <div className="font-mono text-lg font-bold text-slate-800">{formatCurrency(selectedInvestmentTrends[0].value)}</div>
-                       </div>
-                       <div>
-                           <div className="text-[10px] uppercase text-slate-400 font-bold">Totale Versato</div>
-                           <div className="font-mono text-lg font-bold text-slate-600">{formatCurrency(selectedInvestmentTrends[0].totalInvested)}</div>
-                       </div>
-                       <div>
-                           <div className="text-[10px] uppercase text-slate-400 font-bold">Guadagno Netto</div>
-                           <div className={`font-mono text-lg font-bold ${selectedInvestmentTrends[0].value - selectedInvestmentTrends[0].totalInvested >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                               {formatCurrency(selectedInvestmentTrends[0].value - selectedInvestmentTrends[0].totalInvested)}
+                   <div className="relative border-b border-slate-100">
+                     <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-white">
+                        <div>
+                            <div className="text-[10px] uppercase text-slate-400 font-bold">Valore Attuale</div>
+                            <div className="font-mono text-lg font-bold text-slate-800">{formatCurrency(selectedInvestmentTrends[0].value)}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase text-slate-400 font-bold">Totale Versato</div>
+                            <div className="font-mono text-lg font-bold text-slate-600">{formatCurrency(selectedInvestmentTrends[0].totalInvested)}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase text-slate-400 font-bold">Guadagno Netto</div>
+                            <div className={`font-mono text-lg font-bold ${selectedInvestmentTrends[0].value - selectedInvestmentTrends[0].totalInvested >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {formatCurrency(selectedInvestmentTrends[0].value - selectedInvestmentTrends[0].totalInvested)}
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-start">
+                           <div>
+                             <div className="text-[10px] uppercase text-slate-400 font-bold">ROI Totale</div>
+                             <div className={`font-mono text-lg font-bold ${selectedInvestmentTrends[0].totalReturnPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                 {selectedInvestmentTrends[0].totalReturnPercent > 0 ? '+' : ''}{selectedInvestmentTrends[0].totalReturnPercent.toFixed(2)}%
+                             </div>
                            </div>
-                       </div>
-                       <div>
-                           <div className="text-[10px] uppercase text-slate-400 font-bold">ROI Totale</div>
-                           <div className={`font-mono text-lg font-bold ${selectedInvestmentTrends[0].totalReturnPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                               {selectedInvestmentTrends[0].totalReturnPercent > 0 ? '+' : ''}{selectedInvestmentTrends[0].totalReturnPercent.toFixed(2)}%
-                           </div>
-                       </div>
+                           <button 
+                             onClick={() => setShowInfoModal(true)}
+                             className="p-1 rounded-full transition-colors text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                             title="Legenda Metriche"
+                           >
+                             <Info size={16} />
+                           </button>
+                        </div>
+                     </div>
                    </div>
                )}
 
@@ -417,6 +433,43 @@ export const InvestmentManager: React.FC<InvestmentManagerProps> = ({ investment
            </div>
         </div>
       )}
+
+      {/* --- Info Modal for Metrics --- */}
+      <InfoModal
+        isOpen={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title="Legenda Metriche Finanziarie"
+      >
+         <div className="space-y-4">
+            <div>
+               <h4 className="font-bold text-slate-800 mb-1">Valore Attuale</h4>
+               <p>Il saldo finale registrato nel mese più recente.</p>
+            </div>
+            <div>
+               <h4 className="font-bold text-slate-800 mb-1">Totale Versato</h4>
+               <p>La somma di tutti i flussi di cassa (Cash Flow) accumulati dall'inizio.</p>
+            </div>
+            <div>
+               <h4 className="font-bold text-slate-800 mb-1">Guadagno Netto</h4>
+               <p>La differenza assoluta tra quanto vale l'investimento oggi e quanto hai versato di tasca tua.</p>
+            </div>
+            <div>
+               <h4 className="font-bold text-slate-800 mb-1">ROI Totale (%)</h4>
+               <p>Il rendimento percentuale complessivo sul capitale investito.</p>
+            </div>
+            <hr className="border-slate-100" />
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                  <h4 className="font-bold text-blue-600 mb-1">Versato (Mese)</h4>
+                  <p className="text-xs">Soldi aggiunti (+) o prelevati (-) specificamente in quel mese.</p>
+               </div>
+               <div>
+                  <h4 className="font-bold text-emerald-600 mb-1">Maturato (Mese)</h4>
+                  <p className="text-xs">Quanto il mercato ha fatto guadagnare/perdere in quel mese, ESCLUSO il tuo versamento.</p>
+               </div>
+            </div>
+         </div>
+      </InfoModal>
 
       {/* --- Modal: Add/Edit Investment --- */}
       {isInvFormOpen && (

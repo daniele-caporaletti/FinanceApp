@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Calendar, Filter, Layers, Tag, Repeat, Briefcase, BarChart3, Wallet, Coins, User, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Calendar, Filter, Layers, Tag, Repeat, Briefcase, BarChart3, Wallet, Coins, User, ChevronDown, ChevronUp, Search, PieChart } from 'lucide-react';
 import { DbAccount, DbCategory, DbSubcategory } from '../types';
 import { CustomSelect } from './CustomSelect';
 
@@ -75,7 +75,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     : subcategories.filter(s => s.category_id === selectedCategoryId);
 
   return (
-    <div className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-5 mb-6 transition-all relative z-20">
+    <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 mb-6 transition-all relative z-20">
       
       {/* --- Header --- */}
       <div 
@@ -95,173 +95,162 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       <div className={`flex flex-col gap-5 ${isExpanded ? 'flex' : 'hidden md:flex'}`}>
         
-        {/* --- ROW 1: Search + Dates --- */}
-        <div className="flex flex-col lg:flex-row gap-4">
-           {/* Global Search - Fixed width on Desktop */}
-           <div className="relative w-full lg:w-96 shrink-0">
-             <input 
-               type="text" 
-               value={searchQuery}
-               onChange={(e) => onSearchChange(e.target.value)}
-               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-               placeholder="Cerca..."
-             />
-             <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
-           </div>
-
-           <div className="h-full w-px bg-slate-200 hidden lg:block mx-2"></div>
-
-           {/* Date Filters Grouped */}
-           <div className="flex gap-4 w-full">
-              {/* Year */}
-              <div className="space-y-1 flex-1 sm:flex-none sm:w-40">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Anno</label>
-                <CustomSelect
-                  value={selectedYear}
-                  onChange={onYearChange}
-                  options={[
-                    { value: 'ALL', label: 'Tutti gli anni' },
-                    ...years.map(y => ({ value: y, label: y.toString() }))
-                  ]}
-                  icon={<Calendar size={14} />}
-                />
-              </div>
-
-              {/* Month */}
-              <div className="space-y-1 flex-1 sm:flex-none sm:w-48">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Mese</label>
-                <CustomSelect
-                  value={selectedMonth}
-                  onChange={onMonthChange}
-                  options={[
-                    { value: 'ALL', label: 'Tutti i mesi' },
-                    ...MONTHS.map((m, i) => ({ value: i, label: m }))
-                  ]}
-                  icon={<Calendar size={14} />}
-                />
-              </div>
-           </div>
-        </div>
-
-        {/* --- ROW 2: Dimensions --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Account Filter */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Conto</label>
-            <CustomSelect
-              value={selectedAccountId}
-              onChange={onAccountChange}
-              options={[
-                { value: 'ALL', label: 'Tutti i conti' },
-                ...accounts.map(a => ({ value: a.id, label: a.name }))
-              ]}
-              icon={<Wallet size={14} />}
-            />
-          </div>
-
-          {/* Category */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Categoria</label>
-            <CustomSelect
-              value={selectedCategoryId}
-              onChange={onCategoryChange}
-              options={[
-                { value: 'ALL', label: 'Tutte le categorie' },
-                ...categories.map(c => ({ value: c.id, label: c.name }))
-              ]}
-              icon={<Layers size={14} />}
-            />
-          </div>
-
-          {/* Subcategory */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Sottocategoria</label>
-            <CustomSelect
-              value={selectedSubcategoryId}
-              onChange={onSubcategoryChange}
-              options={[
-                { value: 'ALL', label: selectedCategoryId === 'ALL' ? '-' : 'Tutte' },
-                ...availableSubcategories.map(s => ({ value: s.id, label: s.name }))
-              ]}
-              disabled={selectedCategoryId === 'ALL'}
-              icon={<Tag size={14} />}
-            />
-          </div>
-        </div>
-
-        {/* --- ROW 3: Attributes & Toggles --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-slate-100">
-          
-           {/* Recurrence Type */}
-           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Ricorrenza</label>
-            <CustomSelect
-              value={recurrenceFilter}
-              onChange={onRecurrenceChange}
-              options={[
-                { value: 'ALL', label: 'Tutti' },
-                { value: 'ONE_OFF', label: 'Singoli' },
-                { value: 'RECURRING', label: 'Ricorrenti' }
-              ]}
-              icon={<Repeat size={14} />}
-            />
-          </div>
-
-          {/* Context Filter */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Contesto</label>
-            <CustomSelect
-              value={contextFilter}
-              onChange={onContextChange}
-              options={[
-                { value: 'ALL', label: 'Tutti' },
-                { value: 'PERSONAL', label: 'Personale' },
-                { value: 'WORK', label: 'Lavoro' }
-              ]}
-              icon={<User size={14} />}
-            />
-          </div>
-
-          {/* Amount Type Filter */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Tipo Importo</label>
-            <CustomSelect
-              value={amountFilter}
-              onChange={onAmountChange}
-              options={[
-                { value: 'ALL', label: 'Tutti' },
-                { value: 'INCOME', label: 'Entrate' },
-                { value: 'EXPENSE', label: 'Uscite' }
-              ]}
-              icon={<Coins size={14} />}
-            />
-          </div>
-
-          {/* Spacer */}
-          <div className="hidden lg:block"></div>
-
-          {/* Toggle: View Transfers */}
-          <div className="relative flex items-center h-full pt-4">
-             <label className="flex items-center cursor-pointer select-none group w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-100 transition-colors">
-                <div className="relative">
+        {/* --- GRID SYSTEM FOR PERFECT ALIGNMENT --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+            
+            {/* 1. Global Search */}
+            <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Ricerca Libera</label>
+                <div className="relative w-full">
                   <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={viewTransfers}
-                    onChange={(e) => onViewTransfersChange(e.target.checked)}
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 text-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-shadow h-[42px]"
+                    placeholder="Cerca in note, categorie, tag..."
                   />
-                  <div className="block bg-slate-300 w-9 h-5 rounded-full peer-checked:bg-indigo-600 transition-colors"></div>
-                  <div className="dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform peer-checked:translate-x-4"></div>
+                  <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
                 </div>
-                <div className="ml-3 text-sm font-bold text-slate-600 group-hover:text-indigo-700 flex items-center gap-2 transition-colors">
-                   <BarChart3 size={16} />
-                   <span>Vedi Trasferimenti</span>
-                </div>
-             </label>
-          </div>
+            </div>
+
+            {/* 2. Year */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Anno</label>
+              <CustomSelect
+                value={selectedYear}
+                onChange={onYearChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti gli anni' },
+                  ...years.map(y => ({ value: y, label: y.toString() }))
+                ]}
+                icon={<Calendar size={14} />}
+              />
+            </div>
+
+            {/* 3. Month */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Mese</label>
+              <CustomSelect
+                value={selectedMonth}
+                onChange={onMonthChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti i mesi' },
+                  ...MONTHS.map((m, i) => ({ value: i, label: m }))
+                ]}
+                icon={<Calendar size={14} />}
+              />
+            </div>
+
+            {/* 4. Account */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Conto</label>
+              <CustomSelect
+                value={selectedAccountId}
+                onChange={onAccountChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti i conti' },
+                  ...accounts.map(a => ({ value: a.id, label: a.name }))
+                ]}
+                icon={<Wallet size={14} />}
+              />
+            </div>
+
+            {/* 5. Category */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Categoria</label>
+              <CustomSelect
+                value={selectedCategoryId}
+                onChange={onCategoryChange}
+                options={[
+                  { value: 'ALL', label: 'Tutte le categorie' },
+                  ...categories.map(c => ({ value: c.id, label: c.name }))
+                ]}
+                icon={<Layers size={14} />}
+              />
+            </div>
+
+            {/* 6. Subcategory */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Sottocategoria</label>
+              <CustomSelect
+                value={selectedSubcategoryId}
+                onChange={onSubcategoryChange}
+                options={[
+                  { value: 'ALL', label: selectedCategoryId === 'ALL' ? '-' : 'Tutte' },
+                  ...availableSubcategories.map(s => ({ value: s.id, label: s.name }))
+                ]}
+                disabled={selectedCategoryId === 'ALL'}
+                icon={<Tag size={14} />}
+              />
+            </div>
+
+             {/* 7. Amount Type */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Tipo Importo</label>
+              <CustomSelect
+                value={amountFilter}
+                onChange={onAmountChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti' },
+                  { value: 'INCOME', label: 'Entrate' },
+                  { value: 'EXPENSE', label: 'Uscite' }
+                ]}
+                icon={<Coins size={14} />}
+              />
+            </div>
+
+            {/* 8. Recurrence */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Ricorrenza</label>
+              <CustomSelect
+                value={recurrenceFilter}
+                onChange={onRecurrenceChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti' },
+                  { value: 'ONE_OFF', label: 'Singoli' },
+                  { value: 'RECURRING', label: 'Ricorrenti' }
+                ]}
+                icon={<Repeat size={14} />}
+              />
+            </div>
+
+            {/* 9. Context */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Contesto</label>
+              <CustomSelect
+                value={contextFilter}
+                onChange={onContextChange}
+                options={[
+                  { value: 'ALL', label: 'Tutti' },
+                  { value: 'PERSONAL', label: 'Personale' },
+                  { value: 'WORK', label: 'Lavoro' }
+                ]}
+                icon={<User size={14} />}
+              />
+            </div>
+
+            {/* 10. Toggle: View Transfers (Span 2 on small screens for better fit) */}
+            <div className="sm:col-span-2">
+               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1">Opzioni Visualizzazione</label>
+               <label className="flex items-center cursor-pointer select-none group w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-[9px] hover:bg-slate-100 transition-colors h-[42px]">
+                  <div className="relative shrink-0">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={viewTransfers}
+                      onChange={(e) => onViewTransfersChange(e.target.checked)}
+                    />
+                    <div className="block bg-slate-300 w-9 h-5 rounded-full peer-checked:bg-indigo-600 transition-colors"></div>
+                    <div className="dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform peer-checked:translate-x-4"></div>
+                  </div>
+                  <div className="ml-3 text-sm font-medium text-slate-600 group-hover:text-indigo-700 flex items-center gap-2 transition-colors">
+                     <BarChart3 size={16} />
+                     <span>Includi Giroconti / Trasferimenti</span>
+                  </div>
+               </label>
+            </div>
 
         </div>
-
       </div>
     </div>
   );

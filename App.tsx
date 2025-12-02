@@ -126,6 +126,11 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const handleNavigateToInvestments = useCallback(() => {
+    setActiveTab('investments');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const handleNavigateToTransactions = useCallback((navFilters: NavigationFilters) => {
     // Bulk update filters based on dashboard click
     setFilters({
@@ -173,8 +178,6 @@ const App: React.FC = () => {
     { id: 'investments', label: 'Investimenti', icon: TrendingUp },
   ] as const;
 
-  const showStatusBar = isSyncing || (syncStatus === 'Complete') || error;
-
   // --- RENDER ---
 
   if (isAuthChecking) {
@@ -195,37 +198,13 @@ const App: React.FC = () => {
         onSync={() => handleSync(false)} 
         onLogout={handleSignOut}
         isSyncing={isSyncing} 
+        syncStatus={syncStatus}
+        syncError={error}
         transactionCount={transactions?.length || 0}
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-8 relative pb-24 md:pb-12">
         
-        {/* Status Bar (Only if needed) */}
-        {showStatusBar && (
-          <div className="flex justify-start mb-4">
-              <div className="h-8 flex items-center">
-                  {isSyncing && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 animate-pulse shadow-sm">
-                          <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                          {syncStatus}
-                      </div>
-                  )}
-                  {!isSyncing && syncStatus === 'Complete' && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100 shadow-sm animate-in fade-in zoom-in duration-300">
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                          Sync Complete
-                      </div>
-                  )}
-                  {error && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-medium border border-red-100 shadow-sm">
-                          <span className="w-2 h-2 bg-red-600 rounded-full"></span>
-                          Error: {error}
-                      </div>
-                  )}
-              </div>
-          </div>
-        )}
-
         {/* Desktop Navigation */}
         <div className="hidden md:flex justify-between items-center mb-8">
           <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-full border border-white/40 shadow-sm">
@@ -260,9 +239,12 @@ const App: React.FC = () => {
             <Dashboard 
               transactions={transactions || []}
               accounts={accounts || []}
-              categories={categories || []} // Pass categories
+              categories={categories || []} 
               years={availableYears}
+              investments={investments || []}
+              investmentTrends={investmentTrends || []}
               onNavigateToAccounts={handleNavigateToAccounts}
+              onNavigateToInvestments={handleNavigateToInvestments}
               onNavigateToTransactions={handleNavigateToTransactions}
             />
           )}
