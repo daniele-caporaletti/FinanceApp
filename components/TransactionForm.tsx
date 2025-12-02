@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { DbAccount, DbCategory, DbSubcategory, MegaTransaction } from '../types';
 import { saveTransaction, saveTransfer, updateTransaction } from '../services/supabaseService';
@@ -168,35 +169,35 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         </div>
 
         {/* Tabs */}
-        {!isEditMode ? (
-          <div className="flex border-b border-slate-200 shrink-0">
-            <button 
-              onClick={() => setActiveType('NORMAL')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
-                ${activeType === 'NORMAL' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              <Coins size={16} /> Movimento
-            </button>
-            <button 
-              onClick={() => setActiveType('TRANSFER')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
-                ${activeType === 'TRANSFER' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              <ArrowRightLeft size={16} /> Giroconto
-            </button>
-            <button 
-              onClick={() => setActiveType('RECURRING')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
-                ${activeType === 'RECURRING' ? 'border-amber-600 text-amber-600 bg-amber-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              <Repeat size={16} /> Ricorrente
-            </button>
-          </div>
-        ) : (
-          <div className="bg-indigo-50 p-2 text-center text-sm text-indigo-800 border-b border-indigo-100 font-medium shrink-0">
-             Modalità Modifica
-          </div>
-        )}
+        <div className="flex border-b border-slate-200 shrink-0">
+          <button 
+            onClick={() => setActiveType('NORMAL')}
+            className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
+              ${activeType === 'NORMAL' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <Coins size={16} /> Movimento
+          </button>
+          
+          {/* Disable Transfer tab in Edit Mode to avoid complex split-transaction editing */}
+          <button 
+            onClick={() => !isEditMode && setActiveType('TRANSFER')}
+            disabled={isEditMode}
+            className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
+              ${activeType === 'TRANSFER' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}
+              ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
+          >
+            <ArrowRightLeft size={16} /> Giroconto
+          </button>
+          
+          <button 
+            onClick={() => setActiveType('RECURRING')}
+            className={`flex-1 py-3 text-xs sm:text-sm font-medium flex justify-center items-center gap-1 sm:gap-2 border-b-2 transition-colors
+              ${activeType === 'RECURRING' ? 'border-amber-600 text-amber-600 bg-amber-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <Repeat size={16} /> Ricorrente
+          </button>
+        </div>
 
         {/* Form Body */}
         <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">

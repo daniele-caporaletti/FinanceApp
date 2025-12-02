@@ -138,7 +138,8 @@ const App: React.FC = () => {
       categoryId: navFilters.categoryId || 'ALL', 
       excludeCategoryId: navFilters.excludeCategoryId || null, // Handle exclusion
       subcategoryId: 'ALL',
-      accountId: 'ALL'
+      accountId: 'ALL',
+      search: '' // Reset search when navigating from dashboard
     });
 
     setActiveTab('transactions');
@@ -283,6 +284,7 @@ const App: React.FC = () => {
                 contextFilter={filters.context}
                 amountFilter={filters.amount}
                 viewTransfers={filters.viewTransfers}
+                searchQuery={filters.search}
 
                 onYearChange={(v) => setFilter('year', v)}
                 onMonthChange={(v) => setFilter('month', v)}
@@ -293,6 +295,7 @@ const App: React.FC = () => {
                 onContextChange={(v) => setFilter('context', v)}
                 onAmountChange={(v) => setFilter('amount', v)}
                 onViewTransfersChange={(v) => setFilter('viewTransfers', v)}
+                onSearchChange={(v) => setFilter('search', v)}
               />
 
               <TransactionTable 
@@ -327,8 +330,8 @@ const App: React.FC = () => {
 
       {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] z-40 pb-safe">
-        <div className="grid grid-cols-5 h-16 px-1">
-          {NAV_ITEMS.filter(item => item.id !== 'categories').slice(0, 5).map((item) => (
+        <div className="grid grid-cols-6 h-16 px-1">
+          {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id as any); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -339,7 +342,7 @@ const App: React.FC = () => {
               <div className={`p-1.5 rounded-xl transition-all ${activeTab === item.id ? 'bg-indigo-50 shadow-sm' : ''}`}>
                 <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 2} />
               </div>
-              <span className={`text-[9px] font-medium tracking-tight ${activeTab === item.id ? 'font-bold' : ''}`}>{item.label}</span>
+              <span className={`text-[9px] font-medium tracking-tight truncate w-full text-center px-0.5 ${activeTab === item.id ? 'font-bold' : ''}`}>{item.label}</span>
             </button>
           ))}
         </div>

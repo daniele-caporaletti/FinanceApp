@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Calendar, Filter, Layers, Tag, Repeat, Briefcase, BarChart3, Wallet, Coins, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Filter, Layers, Tag, Repeat, Briefcase, BarChart3, Wallet, Coins, User, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { DbAccount, DbCategory, DbSubcategory } from '../types';
 import { CustomSelect } from './CustomSelect';
 
@@ -20,6 +21,7 @@ interface FilterBarProps {
   amountFilter: 'ALL' | 'INCOME' | 'EXPENSE';
   
   viewTransfers: boolean;
+  searchQuery: string;
 
   onYearChange: (year: number | 'ALL') => void;
   onMonthChange: (month: number | 'ALL') => void;
@@ -32,6 +34,7 @@ interface FilterBarProps {
   onAmountChange: (val: 'ALL' | 'INCOME' | 'EXPENSE') => void;
   
   onViewTransfersChange: (val: boolean) => void;
+  onSearchChange: (val: string) => void;
 }
 
 const MONTHS = [
@@ -53,6 +56,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   contextFilter,
   amountFilter,
   viewTransfers,
+  searchQuery,
   onYearChange,
   onMonthChange,
   onCategoryChange,
@@ -61,7 +65,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onRecurrenceChange,
   onContextChange,
   onAmountChange,
-  onViewTransfersChange
+  onViewTransfersChange,
+  onSearchChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -90,6 +95,18 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       <div className={`flex flex-col gap-5 ${isExpanded ? 'flex' : 'hidden md:flex'}`}>
         
+        {/* --- Global Search --- */}
+        <div className="relative">
+           <input 
+             type="text" 
+             value={searchQuery}
+             onChange={(e) => onSearchChange(e.target.value)}
+             className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+             placeholder="Cerca in note, categorie, tag..."
+           />
+           <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+        </div>
+
         {/* --- ROW 1: Primary Dimensions --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           

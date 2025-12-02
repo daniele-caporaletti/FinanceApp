@@ -12,7 +12,8 @@ export interface FilterState {
   context: 'ALL' | 'PERSONAL' | 'WORK';
   amount: 'ALL' | 'INCOME' | 'EXPENSE';
   viewTransfers: boolean;
-  excludeCategoryId?: string | null; // New hidden filter
+  excludeCategoryId?: string | null;
+  search: string; // New search filter
 }
 
 export const useTransactionFilters = (transactions: MegaTransaction[] | undefined, accounts: DbAccount[] | undefined) => {
@@ -27,7 +28,8 @@ export const useTransactionFilters = (transactions: MegaTransaction[] | undefine
     context: 'ALL',
     amount: 'ALL',
     viewTransfers: false,
-    excludeCategoryId: null
+    excludeCategoryId: null,
+    search: ''
   });
 
   // Derived: Available Years
@@ -47,6 +49,19 @@ export const useTransactionFilters = (transactions: MegaTransaction[] | undefine
     if (!transactions) return [];
 
     return transactions.filter(t => {
+      // 0. Search Filter (Global Text Search)
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const matches = (
+          (t.note && t.note.toLowerCase().includes(q)) ||
+          (t.category_name && t.category_name.toLowerCase().includes(q)) ||
+          (t.subcategory_name && t.subcategory_name.toLowerCase().includes(q)) ||
+          (t.account_name && t.account_name.toLowerCase().includes(q)) ||
+          (t.tag && t.tag.toLowerCase().includes(q))
+        );
+        if (!matches) return false;
+      }
+
       // 1. Date Filters
       const txYear = parseInt(t.date.substring(0, 4), 10);
       const txMonth = parseInt(t.date.substring(5, 7), 10) - 1;
