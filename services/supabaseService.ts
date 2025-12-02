@@ -7,17 +7,24 @@ import { db } from './db';
 let supabase: SupabaseClient | null = null;
 
 export const initSupabase = (key: string) => {
+  if (!SUPABASE_URL) {
+    throw new Error("VITE_SUPABASE_URL mancante. Verifica le variabili d'ambiente su Netlify.");
+  }
+  if (!key) {
+    throw new Error("Chiave di decrittazione non valida.");
+  }
+
   try {
     supabase = createClient(SUPABASE_URL, key);
   } catch (error) {
     console.error("Failed to initialize Supabase client", error);
-    throw new Error("Invalid Key provided.");
+    throw new Error("Impossibile connettersi a Supabase. Chiave o URL errati.");
   }
 };
 
 const getSupabase = () => {
   if (!supabase) {
-    throw new Error("Application locked. Please login to decrypt the database key.");
+    throw new Error("Applicazione bloccata. Effettua il login per decriptare il database.");
   }
   return supabase;
 }
