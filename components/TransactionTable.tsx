@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { MegaTransaction } from '../types';
-import { AlertCircle, Check, X, Trash2, Pencil, Wallet } from 'lucide-react';
+import { AlertCircle, Check, X, Trash2, Pencil, Wallet, Repeat } from 'lucide-react';
 import { formatCurrency, formatCurrencyWithSign, formatDateShort } from '../utils';
 
 interface TransactionTableProps {
@@ -55,9 +55,12 @@ const MobileTransactionCard: React.FC<MobileCardProps> = ({
                <span className={`font-mono font-bold text-sm leading-tight ${tx.amount_base < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
                   {formatCurrencyWithSign(tx.amount_base)}
                </span>
-               <span className="text-[10px] text-slate-400 font-medium mt-0.5">
-                  {formatDateShort(tx.date)}
-               </span>
+               <div className="flex items-center gap-1.5 mt-0.5">
+                 {tx.recurrence === 'recurring' && <Repeat size={10} className="text-purple-500" />}
+                 <span className="text-[10px] text-slate-400 font-medium">
+                    {formatDateShort(tx.date)}
+                 </span>
+               </div>
             </div>
          </div>
 
@@ -142,7 +145,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px]">Tag</th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-right border-l border-slate-200/50">CHF Base</th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-center">Analisi</th>
-                <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px]">Contesto</th>
+                <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px]">Info</th>
                 <th className="px-5 py-4 font-bold text-slate-400 uppercase tracking-wider text-[11px] text-center">Azioni</th>
               </tr>
             </thead>
@@ -173,7 +176,19 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                       ? <div className="w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto"><Check size={12} /></div> 
                       : <div className="w-5 h-5 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto"><X size={12} /></div>}
                   </td>
-                  <td className="px-5 py-3 text-slate-500 text-xs">{tx.context ? <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${tx.context === 'work' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{tx.context}</span> : '-'}</td>
+                  
+                  {/* Info Column: Context + Recurrence */}
+                  <td className="px-5 py-3 text-slate-500 text-xs">
+                    <div className="flex items-center gap-1.5">
+                       {tx.context ? <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${tx.context === 'work' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{tx.context}</span> : '-'}
+                       {tx.recurrence === 'recurring' && (
+                         <span className="p-1 bg-purple-50 text-purple-600 rounded-full" title="Ricorrente">
+                           <Repeat size={12} />
+                         </span>
+                       )}
+                    </div>
+                  </td>
+
                   <td className="px-5 py-3 text-center whitespace-nowrap">
                     <div className="flex items-center justify-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onEdit(tx)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>

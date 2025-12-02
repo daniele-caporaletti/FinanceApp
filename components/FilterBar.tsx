@@ -95,49 +95,56 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       <div className={`flex flex-col gap-5 ${isExpanded ? 'flex' : 'hidden md:flex'}`}>
         
-        {/* --- Global Search --- */}
-        <div className="relative">
-           <input 
-             type="text" 
-             value={searchQuery}
-             onChange={(e) => onSearchChange(e.target.value)}
-             className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-             placeholder="Cerca in note, categorie, tag..."
-           />
-           <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+        {/* --- ROW 1: Search + Dates --- */}
+        <div className="flex flex-col lg:flex-row gap-4">
+           {/* Global Search - Fixed width on Desktop */}
+           <div className="relative w-full lg:w-96 shrink-0">
+             <input 
+               type="text" 
+               value={searchQuery}
+               onChange={(e) => onSearchChange(e.target.value)}
+               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+               placeholder="Cerca..."
+             />
+             <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
+           </div>
+
+           <div className="h-full w-px bg-slate-200 hidden lg:block mx-2"></div>
+
+           {/* Date Filters Grouped */}
+           <div className="flex gap-4 w-full">
+              {/* Year */}
+              <div className="space-y-1 flex-1 sm:flex-none sm:w-40">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Anno</label>
+                <CustomSelect
+                  value={selectedYear}
+                  onChange={onYearChange}
+                  options={[
+                    { value: 'ALL', label: 'Tutti gli anni' },
+                    ...years.map(y => ({ value: y, label: y.toString() }))
+                  ]}
+                  icon={<Calendar size={14} />}
+                />
+              </div>
+
+              {/* Month */}
+              <div className="space-y-1 flex-1 sm:flex-none sm:w-48">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Mese</label>
+                <CustomSelect
+                  value={selectedMonth}
+                  onChange={onMonthChange}
+                  options={[
+                    { value: 'ALL', label: 'Tutti i mesi' },
+                    ...MONTHS.map((m, i) => ({ value: i, label: m }))
+                  ]}
+                  icon={<Calendar size={14} />}
+                />
+              </div>
+           </div>
         </div>
 
-        {/* --- ROW 1: Primary Dimensions --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          
-          {/* Year */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Anno</label>
-            <CustomSelect
-              value={selectedYear}
-              onChange={onYearChange}
-              options={[
-                { value: 'ALL', label: 'Tutti gli anni' },
-                ...years.map(y => ({ value: y, label: y.toString() }))
-              ]}
-              icon={<Calendar size={14} />}
-            />
-          </div>
-
-          {/* Month */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Mese</label>
-            <CustomSelect
-              value={selectedMonth}
-              onChange={onMonthChange}
-              options={[
-                { value: 'ALL', label: 'Tutti i mesi' },
-                ...MONTHS.map((m, i) => ({ value: i, label: m }))
-              ]}
-              icon={<Calendar size={14} />}
-            />
-          </div>
-
+        {/* --- ROW 2: Dimensions --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Account Filter */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Conto</label>
@@ -182,7 +189,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </div>
         </div>
 
-        {/* --- ROW 2: Attributes & Toggles --- */}
+        {/* --- ROW 3: Attributes & Toggles --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-slate-100">
           
            {/* Recurrence Type */}
