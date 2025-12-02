@@ -1,16 +1,25 @@
 
-// Fallback keys (Obfuscated to allow preview/login without env vars in dev)
-// Real keys should be set in Netlify Environment Variables
-const CFG_1 = "c2JfcHVibGlzaGFibGVfbjZ4eW0xejZaYjZsSUJWYlRjaVFRd1";
-const CFG_2 = "9ic3VIai1VZA==";
+// Environment Variables with Safe Fallback
+// In production (Netlify), these should be set in the dashboard.
+// Locally, it falls back to the hardcoded values for immediate usage if env vars are missing in preview.
 
-const ENV_URL = (import.meta as any).env?.VITE_SUPABASE_URL;
-const ENV_SECRET = (import.meta as any).env?.VITE_APP_SECRET;
+// Safe access to avoid crashes in environments where import.meta.env is undefined
+const getEnvVar = (key: string) => {
+  try {
+    // @ts-ignore
+    return import.meta.env?.[key];
+  } catch (e) {
+    return undefined;
+  }
+};
+
+const ENV_URL = getEnvVar('VITE_SUPABASE_URL');
+const ENV_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_KEY'); // Check both for compatibility
 
 export const SUPABASE_URL = ENV_URL || "https://zofiedtdignlsjyzsdge.supabase.co";
 
-// Use Env var if available, otherwise fallback to the obfuscated key
-export const APP_SECRET = ENV_SECRET || (CFG_1 + CFG_2);
+// Using the provided ANON KEY from your example
+export const SUPABASE_KEY = ENV_KEY || "sb_publishable_n6xym1z6Zb6lIBVbTciQQw_bsuHj-Ud";
 
 export const DB_NAME = 'FinanceAppDB';
 export const DB_VERSION = 5;

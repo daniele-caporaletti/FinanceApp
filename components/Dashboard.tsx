@@ -240,7 +240,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span className="p-1 rounded bg-rose-50 text-rose-500"><TrendingDown size={14} /></span> Uscite Var. (Mese)
           </div>
           <div className="text-2xl md:text-3xl font-bold font-mono tracking-tighter text-slate-800">
-            CHF <span className="text-rose-600">{Math.floor(spentThisMonth).toLocaleString('en-US')}</span><span className="text-lg text-rose-500">.{spentDisplay.decimal}</span>
+            CHF <span className="text-rose-600">{spentThisMonth < 0 ? '-' : ''}{spentDisplay.integer}</span><span className="text-lg text-rose-500">.{spentDisplay.decimal}</span>
           </div>
         </div>
 
@@ -263,7 +263,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             
             <div className="mt-2 md:mt-4">
               <div className="text-3xl md:text-5xl font-bold font-mono tracking-tighter text-white">
-                CHF {Math.floor(netWorthCHF).toLocaleString('en-US')}<span className="text-lg md:text-2xl text-slate-400">.{netWorthDisplay.decimal}</span>
+                CHF {netWorthCHF < 0 ? '-' : ''}{netWorthDisplay.integer}<span className="text-lg md:text-2xl text-slate-400">.{netWorthDisplay.decimal}</span>
               </div>
               <p className="text-white/40 text-xs md:text-sm mt-1 md:mt-2 font-medium">Totale asset convertiti</p>
             </div>

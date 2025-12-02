@@ -1,15 +1,16 @@
 
 import React from 'react';
-import { Database, RefreshCw } from 'lucide-react';
+import { Database, RefreshCw, LogOut } from 'lucide-react';
 import { InstallPWA } from './InstallPWA';
 
 interface HeaderProps {
   onSync: () => void;
+  onLogout: () => void;
   isSyncing: boolean;
   transactionCount: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCount }) => {
+export const Header: React.FC<HeaderProps> = ({ onSync, onLogout, isSyncing, transactionCount }) => {
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-30 safe-top transition-all duration-300">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -28,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCo
         </div>
 
         {/* Actions Section */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <InstallPWA />
           
           <div className="hidden md:flex flex-col items-end border-r border-slate-200/60 pr-4 mr-1">
@@ -50,6 +51,14 @@ export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCo
           >
             <RefreshCw size={16} className={`sm:w-[16px] sm:h-[16px] ${isSyncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+          </button>
+
+          <button 
+            onClick={onLogout}
+            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors active:scale-95"
+            title="Logout"
+          >
+             <LogOut size={18} />
           </button>
         </div>
       </div>

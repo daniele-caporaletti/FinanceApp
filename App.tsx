@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './services/db';
-import { syncData, deleteTransaction } from './services/supabaseService';
+import { syncData, deleteTransaction, getSession, onAuthStateChange, authSignOut } from './services/supabaseService';
 import { Header } from './components/Header';
 import { TransactionTable } from './components/TransactionTable';
 import { FilterBar } from './components/FilterBar';
@@ -17,10 +17,14 @@ import { LoginScreen } from './components/LoginScreen';
 import { MegaTransaction } from './types';
 import { LayoutDashboard, WalletCards, Layers, Plus, Tag, TableProperties, TrendingUp } from 'lucide-react';
 import { useTransactionFilters } from './hooks/useTransactionFilters';
+import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
-  // --- Auth & Sync State ---
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // --- Auth State ---
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // --- Sync State ---
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +65,61 @@ const App: React.FC = () => {
     return Array.from(tags).sort();
   }, [transactions]);
 
+  // --- Auth Logic ---
+  useEffect(() => {
+    // Check initial session
+    getSession().then(({ data }) => {
+      setSession(data.session);
+      setIsAuthChecking(false);
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = onAuthStateChange((s) => {
+      setSession(s);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // --- Sync Logic ---
+  const handleSync = useCallback(async (initializeFilters = false) => {
+    if (!session) return; // Don't sync if not logged in
+
+    setIsSyncing(true);
+    setError(null);
+    setSyncStatus('Initializing...');
+    
+    try {
+      await syncData((status) => setSyncStatus(status));
+
+      if (initializeFilters) {
+        const now = new Date();
+        setFilter('year', now.getFullYear());
+        setFilter('month', now.getMonth());
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncStatus(''), 3000);
+    }
+  }, [setFilter, session]);
+
+  // Auto-sync when session becomes active
+  useEffect(() => {
+    if (session) {
+      handleSync(true);
+    }
+  }, [session, handleSync]);
+
   // --- Actions ---
+
+  const handleSignOut = async () => {
+    await authSignOut();
+    setSession(null);
+    // Optional: Clear local DB on logout? 
+    // await db.delete(); await db.open(); 
+  };
 
   const handleNavigateToAccounts = useCallback(() => {
     setActiveTab('accounts');
@@ -87,27 +145,6 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [setFilters]);
 
-  const handleSync = useCallback(async (initializeFilters = false) => {
-    setIsSyncing(true);
-    setError(null);
-    setSyncStatus('Initializing...');
-    
-    try {
-      await syncData((status) => setSyncStatus(status));
-
-      if (initializeFilters) {
-        const now = new Date();
-        setFilter('year', now.getFullYear());
-        setFilter('month', now.getMonth());
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsSyncing(false);
-      setTimeout(() => setSyncStatus(''), 3000);
-    }
-  }, [setFilter]);
-
   const handleEdit = (tx: MegaTransaction) => {
     setEditingTransaction(tx);
     setIsTxFormOpen(true);
@@ -126,11 +163,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLoginSuccess = useCallback(() => {
-    setIsAuthenticated(true);
-    handleSync(true); // Auto-sync on login
-  }, [handleSync]);
-
   const NAV_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Movimenti', icon: TableProperties },
@@ -142,41 +174,54 @@ const App: React.FC = () => {
 
   const showStatusBar = isSyncing || (syncStatus === 'Complete') || error;
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLoginSuccess} />;
+  // --- RENDER ---
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen onLoginSuccess={() => {}} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col pb-safe md:pb-0">
       <Header 
         onSync={() => handleSync(false)} 
+        onLogout={handleSignOut}
         isSyncing={isSyncing} 
         transactionCount={transactions?.length || 0}
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-8 relative pb-24 md:pb-12">
         
-        {/* Status Bar */}
+        {/* Status Bar (Only if needed) */}
         {showStatusBar && (
-          <div className="mb-4 sm:mb-6 h-8 flex items-center justify-center sm:justify-start">
-              {isSyncing && (
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 animate-pulse shadow-sm">
-                      <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                      {syncStatus}
-                  </div>
-              )}
-              {!isSyncing && syncStatus === 'Complete' && (
-                   <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100 shadow-sm animate-in fade-in zoom-in duration-300">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                      Sync Complete
-                   </div>
-              )}
-              {error && (
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-medium border border-red-100 shadow-sm">
-                      <span className="w-2 h-2 bg-red-600 rounded-full"></span>
-                      Error: {error}
-                  </div>
-              )}
+          <div className="flex justify-start mb-4">
+              <div className="h-8 flex items-center">
+                  {isSyncing && (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100 animate-pulse shadow-sm">
+                          <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                          {syncStatus}
+                      </div>
+                  )}
+                  {!isSyncing && syncStatus === 'Complete' && (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100 shadow-sm animate-in fade-in zoom-in duration-300">
+                          <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                          Sync Complete
+                      </div>
+                  )}
+                  {error && (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-medium border border-red-100 shadow-sm">
+                          <span className="w-2 h-2 bg-red-600 rounded-full"></span>
+                          Error: {error}
+                      </div>
+                  )}
+              </div>
           </div>
         )}
 

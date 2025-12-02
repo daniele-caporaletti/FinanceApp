@@ -1,30 +1,41 @@
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SUPABASE_URL } from '../constants';
+import { createClient, SupabaseClient, Session } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_KEY } from '../constants';
 import { DbAccount, DbCategory, DbSubcategory, DbTransaction, MegaTransaction, DbInvestment, DbInvestmentTrend } from '../types';
 import { db } from './db';
 
-let supabase: SupabaseClient | null = null;
-
-export const initSupabase = (secret: string) => {
-  if (!SUPABASE_URL || !secret) {
-    console.error("Missing Supabase URL or Secret");
-    return;
-  }
-  try {
-    supabase = createClient(SUPABASE_URL, secret);
-  } catch (error) {
-    console.error("Failed to initialize Supabase client", error);
-    throw new Error("Initialization failed.");
-  }
-};
+// Initialize Supabase immediately
+const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const getSupabase = () => {
-  if (!supabase) {
-    throw new Error("Application locked. Please login.");
-  }
   return supabase;
 }
+
+// --- AUTHENTICATION METHODS ---
+
+export const authSignIn = async (email: string, password: string) => {
+  return await supabase.auth.signInWithPassword({ email, password });
+};
+
+export const authSignUp = async (email: string, password: string) => {
+  return await supabase.auth.signUp({ email, password });
+};
+
+export const authSignOut = async () => {
+  return await supabase.auth.signOut();
+};
+
+export const getSession = async () => {
+  return await supabase.auth.getSession();
+};
+
+export const onAuthStateChange = (callback: (session: Session | null) => void) => {
+  return supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session);
+  });
+};
+
+// --- DATA SYNC METHODS ---
 
 // Helper to fetch ALL rows by automatically paginating
 const fetchAllRows = async <T>(tableName: string, onProgress?: (count: number) => void): Promise<T[]> => {
