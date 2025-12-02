@@ -207,7 +207,7 @@ const App: React.FC = () => {
   const NAV_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Movimenti', icon: TableProperties },
-    { id: 'tags', label: 'Analisi Tag', icon: Tag },
+    { id: 'tags', label: 'Tag', icon: Tag },
     { id: 'accounts', label: 'Conti', icon: WalletCards },
     { id: 'categories', label: 'Categorie', icon: Layers },
   ] as const;
@@ -217,14 +217,14 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col pb-24 md:pb-0 safe-bottom">
+    <div className="min-h-screen bg-[#F0F2F5] flex flex-col pb-24 md:pb-0 safe-bottom">
       <Header 
         onSync={() => handleSync(false)} 
         isSyncing={isSyncing} 
         transactionCount={transactions?.length || 0}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative">
         
         {/* Status Bar */}
         <div className="mb-6 h-8 flex items-center justify-center sm:justify-start">
@@ -248,17 +248,17 @@ const App: React.FC = () => {
             )}
         </div>
 
-        {/* Desktop Navigation (Floating Pills) */}
+        {/* Desktop Navigation (Floating Pills - Material 3 Style) */}
         <div className="hidden md:flex justify-between items-center mb-8">
-          <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-full border border-white/40 shadow-sm">
+          <div className="flex bg-white p-1.5 rounded-full shadow-sm border border-slate-200">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 ${
+                className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-full transition-all duration-300 ${
                   activeTab === item.id 
-                    ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/50' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
                 }`}
               >
                 <item.icon size={18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
@@ -272,7 +272,7 @@ const App: React.FC = () => {
               setEditingTransaction(null);
               setIsTxFormOpen(true);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-full hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all font-semibold active:scale-95 hover:-translate-y-0.5"
+            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all font-semibold active:scale-95 hover:-translate-y-0.5"
           >
             <Plus size={20} />
             <span className="text-sm">Nuova Transazione</span>
@@ -355,39 +355,42 @@ const App: React.FC = () => {
         
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Glassmorphism) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200/50 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] z-40 pb-safe">
-        <div className="flex justify-around items-center h-16 px-2">
+      {/* Mobile Bottom Navigation Bar (Material 3 Style) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)] z-40 pb-safe">
+        <div className="flex justify-around items-center h-20 px-2">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${
-                activeTab === item.id 
-                  ? 'text-indigo-600 scale-105' 
-                  : 'text-slate-400 hover:text-slate-600'
-              }`}
+              className="flex flex-col items-center justify-center w-full h-full gap-1 group"
             >
-              <div className={`p-1 rounded-full ${activeTab === item.id ? 'bg-indigo-50' : ''}`}>
-                <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+              <div className={`
+                 px-5 py-1.5 rounded-full transition-all duration-300
+                 ${activeTab === item.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 group-hover:text-slate-600'}
+              `}>
+                <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
               </div>
-              <span className="text-[9px] font-semibold tracking-tight">{item.label}</span>
+              <span className={`text-[10px] font-bold tracking-tight transition-colors ${activeTab === item.id ? 'text-indigo-700' : 'text-slate-400'}`}>
+                {item.label}
+              </span>
             </button>
           ))}
-          {/* Mobile Install Button in Nav */}
-          <div className="w-full h-full flex flex-col items-center justify-center">
-            <InstallPWA isMobile={true} />
+          {/* Mobile Install Button */}
+          <div className="w-full h-full flex flex-col items-center justify-center pt-1">
+             <div className="px-5 py-1.5">
+                 <InstallPWA isMobile={true} />
+             </div>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Floating Action Button (FAB) */}
+      {/* Mobile Floating Action Button (FAB) - Material 3 Style */}
       <button
         onClick={() => {
           setEditingTransaction(null);
           setIsTxFormOpen(true);
         }}
-        className="md:hidden fixed bottom-20 right-5 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl shadow-indigo-500/30 flex items-center justify-center z-50 active:scale-90 transition-transform hover:bg-indigo-700"
+        className="md:hidden fixed bottom-24 right-5 w-14 h-14 bg-indigo-600 text-white rounded-[16px] shadow-lg shadow-indigo-500/40 flex items-center justify-center z-50 active:scale-90 transition-transform hover:bg-indigo-700"
         aria-label="Nuova Transazione"
       >
         <Plus size={28} />

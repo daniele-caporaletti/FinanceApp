@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL } from '../constants';
 import { DbAccount, DbCategory, DbSubcategory, DbTransaction, MegaTransaction } from '../types';
@@ -6,23 +5,22 @@ import { db } from './db';
 
 let supabase: SupabaseClient | null = null;
 
-export const initSupabase = (key: string) => {
+export const initSupabase = (secret: string) => {
   try {
-    supabase = createClient(SUPABASE_URL, key);
+    supabase = createClient(SUPABASE_URL, secret);
   } catch (error) {
     console.error("Failed to initialize Supabase client", error);
-    throw new Error("Invalid Key provided.");
+    throw new Error("Invalid Configuration.");
   }
 };
 
 const getSupabase = () => {
   if (!supabase) {
-    throw new Error("Application locked. Please login to decrypt the database key.");
+    throw new Error("Application locked.");
   }
   return supabase;
 }
 
-// Helper to fetch ALL rows by automatically paginating
 const fetchAllRows = async <T>(tableName: string, onProgress?: (count: number) => void): Promise<T[]> => {
   let allData: T[] = [];
   let from = 0;
@@ -53,7 +51,6 @@ export const syncData = async (
   onProgress: (status: string) => void
 ): Promise<void> => {
   try {
-    // 1. Fetch all raw tables with pagination handling
     onProgress('Fetching Accounts...');
     const accounts = await fetchAllRows<DbAccount>('account');
 
@@ -63,14 +60,13 @@ export const syncData = async (
     onProgress('Fetching Subcategories...');
     const subcategories = await fetchAllRows<DbSubcategory>('subcategory');
 
-    onProgress('Fetching Transactions (This may take time)...');
+    onProgress('Fetching Transactions...');
     const transactions = await fetchAllRows<DbTransaction>('transaction', (count) => {
       onProgress(`Fetching Transactions... (${count} loaded)`);
     });
 
-    onProgress('Processing "Mega Join"...');
+    onProgress('Processing Data...');
 
-    // 2. Create Lookup Maps for O(1) access
     const accountMap = new Map<string, DbAccount>();
     accounts.forEach(a => accountMap.set(a.id, a));
 
@@ -80,7 +76,6 @@ export const syncData = async (
     const subcategoryMap = new Map<string, DbSubcategory>();
     subcategories.forEach(s => subcategoryMap.set(s.id, s));
 
-    // 3. Perform the Join
     const megaTransactions: MegaTransaction[] = transactions.map((tx) => {
       const account = accountMap.get(tx.account_id);
       const category = categoryMap.get(tx.category_id);
@@ -97,11 +92,9 @@ export const syncData = async (
         amount_original: tx.amount_original,
         amount_base: tx.amount_base,
         
-        // Category Info
         category_id: tx.category_id,
         category_name: category ? category.name : 'Uncategorized',
         
-        // Subcategory Info
         subcategory_id: tx.subcategory_id || null,
         subcategory_name: subcategory ? subcategory.name : '-',
         
@@ -113,9 +106,8 @@ export const syncData = async (
       };
     });
 
-    onProgress(`Saving ${megaTransactions.length} records to local database...`);
+    onProgress(`Saving ${megaTransactions.length} records...`);
 
-    // 4. Save to Dexie (Bulk Put is efficient)
     await db.transaction('rw', db.megaTransactions, db.categories, db.subcategories, db.accounts, async () => {
       await db.megaTransactions.clear(); 
       await db.categories.clear();
@@ -135,8 +127,6 @@ export const syncData = async (
     throw new Error(error.message || "Unknown error during sync");
   }
 };
-
-// --- Account Management Methods ---
 
 export const addAccount = async (name: string, currency: string) => {
   const { data, error } = await getSupabase()
@@ -174,8 +164,6 @@ export const toggleAccountSelect = async (id: string, currentStatus: boolean) =>
   await db.accounts.update(id, { is_select: newStatus });
 };
 
-// --- Category Management Methods ---
-
 export const addCategory = async (name: string) => {
   const { data, error } = await getSupabase()
     .from('category')
@@ -199,8 +187,6 @@ export const addSubcategory = async (categoryId: string, name: string) => {
   if (data) await db.subcategories.put(data);
   return data;
 };
-
-// --- Transaction & Logic Methods ---
 
 const calculateBaseAmountInCHF = async (amountOriginal: number, currency: string, date: string): Promise<number> => {
   let calculatedAmount = amountOriginal;
