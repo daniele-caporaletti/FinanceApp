@@ -53,6 +53,7 @@ const App: React.FC = () => {
   const accounts = useLiveQuery(() => db.accounts.orderBy('name').toArray());
 
   // Filter accounts for the dropdown: Only show those with is_select = true
+  // This is purely for the UI Dropdown.
   const selectableAccounts = useMemo(() => {
     return accounts?.filter(a => a.is_select) || [];
   }, [accounts]);
@@ -85,8 +86,11 @@ const App: React.FC = () => {
       const categoryMatch = selectedCategoryId === 'ALL' || t.category_id === selectedCategoryId;
       const subcategoryMatch = selectedSubcategoryId === 'ALL' || t.subcategory_id === selectedSubcategoryId;
 
-      const isAccountSelectable = selectableAccounts.some(acc => acc.id === t.account_id);
-      const accountMatch = (selectedAccountId === 'ALL' || t.account_id === selectedAccountId) && isAccountSelectable;
+      // CORRECTED LOGIC: 
+      // We only filter by account ID if a specific account is selected.
+      // We do NOT filter out accounts just because they have is_select=false (hidden from dropdown).
+      // This ensures historical data from hidden/closed accounts is still visible in the main table.
+      const accountMatch = selectedAccountId === 'ALL' || t.account_id === selectedAccountId;
 
       const rawRecurrence = t.recurrence ? t.recurrence.trim().toLowerCase() : '';
       const isRecurring = rawRecurrence.length > 0 && rawRecurrence !== 'one_off' && rawRecurrence !== 'none';
@@ -108,7 +112,7 @@ const App: React.FC = () => {
 
       return yearMatch && monthMatch && categoryMatch && subcategoryMatch && accountMatch && recurrenceMatch && analyticsMatch && contextMatch && amountMatch;
     });
-  }, [selectedYear, selectedMonth, selectedCategoryId, selectedSubcategoryId, selectedAccountId, selectableAccounts, recurrenceFilter, contextFilter, amountFilter, viewTransfers]);
+  }, [selectedYear, selectedMonth, selectedCategoryId, selectedSubcategoryId, selectedAccountId, recurrenceFilter, contextFilter, amountFilter, viewTransfers]);
 
   // Derived filtered data for the Table
   const filteredTransactions = useMemo(() => {
@@ -303,6 +307,8 @@ const App: React.FC = () => {
                 years={availableYears}
                 categories={categories || []}
                 subcategories={subcategories || []}
+                
+                // Pass filtered accounts to the Dropdown so we only see 'Selectable' ones in the list
                 accounts={selectableAccounts}
                 
                 selectedYear={selectedYear}
