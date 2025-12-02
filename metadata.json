@@ -1,0 +1,5 @@
+{
+  "name": "FinanceApp",
+  "description": "A financial dashboard that aggregates Supabase transaction data into a local client-side database for analysis.",
+  "requestFramePermissions": []
+}
