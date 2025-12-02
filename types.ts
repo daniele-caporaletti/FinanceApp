@@ -1,3 +1,4 @@
+
 // Raw Database Types matching the Schema Image
 export interface DbAccount {
   id: string;
@@ -31,6 +32,24 @@ export interface DbTransaction {
   analytics_included: boolean;
   context?: string | null;
   recurrence?: string | null;
+}
+
+// Investment Types
+export interface DbInvestment {
+  id: string;
+  name: string;
+  is_for_retirement: boolean;
+  currency: string;
+  note?: string; // Added note field
+}
+
+export interface DbInvestmentTrend {
+  id: string;
+  investment_id: string;
+  month: number;
+  year: number;
+  value: number;
+  cash_flow: number;
 }
 
 // The "Mega Join" Flattened Structure for Frontend Display

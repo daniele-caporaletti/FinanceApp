@@ -1,12 +1,16 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL } from '../constants';
-import { DbAccount, DbCategory, DbSubcategory, DbTransaction, MegaTransaction } from '../types';
+import { DbAccount, DbCategory, DbSubcategory, DbTransaction, MegaTransaction, DbInvestment, DbInvestmentTrend } from '../types';
 import { db } from './db';
 
 let supabase: SupabaseClient | null = null;
 
 export const initSupabase = (secret: string) => {
+  if (!SUPABASE_URL || !secret) {
+    console.error("Missing Supabase URL or Secret");
+    return;
+  }
   try {
     supabase = createClient(SUPABASE_URL, secret);
   } catch (error) {
@@ -17,7 +21,7 @@ export const initSupabase = (secret: string) => {
 
 const getSupabase = () => {
   if (!supabase) {
-    throw new Error("Application locked.");
+    throw new Error("Application locked. Please login.");
   }
   return supabase;
 }
@@ -62,6 +66,12 @@ export const syncData = async (
 
     onProgress('Fetching Subcategories...');
     const subcategories = await fetchAllRows<DbSubcategory>('subcategory');
+    
+    onProgress('Fetching Investments...');
+    const investments = await fetchAllRows<DbInvestment>('investment');
+
+    onProgress('Fetching Investment Trends...');
+    const investmentTrends = await fetchAllRows<DbInvestmentTrend>('investment_trend');
 
     onProgress('Fetching Transactions (This may take time)...');
     const transactions = await fetchAllRows<DbTransaction>('transaction', (count) => {
@@ -113,18 +123,22 @@ export const syncData = async (
       };
     });
 
-    onProgress(`Saving ${megaTransactions.length} records to local database...`);
+    onProgress(`Saving to local database...`);
 
     // 4. Save to Dexie (Bulk Put is efficient)
-    await db.transaction('rw', db.megaTransactions, db.categories, db.subcategories, db.accounts, async () => {
+    await (db as any).transaction('rw', db.megaTransactions, db.categories, db.subcategories, db.accounts, db.investments, db.investmentTrends, async () => {
       await db.megaTransactions.clear(); 
       await db.categories.clear();
       await db.subcategories.clear();
       await db.accounts.clear();
+      await db.investments.clear();
+      await db.investmentTrends.clear();
 
       await db.categories.bulkPut(categories);
       await db.subcategories.bulkPut(subcategories);
       await db.accounts.bulkPut(accounts);
+      await db.investments.bulkPut(investments);
+      await db.investmentTrends.bulkPut(investmentTrends);
       await db.megaTransactions.bulkPut(megaTransactions);
     });
 
@@ -199,6 +213,62 @@ export const addSubcategory = async (categoryId: string, name: string) => {
   if (data) await db.subcategories.put(data);
   return data;
 };
+
+// --- Investment Methods ---
+
+export const addInvestment = async (name: string, currency: string, isForRetirement: boolean, note?: string) => {
+  const { data, error } = await getSupabase()
+    .from('investment')
+    .insert([{ name, currency, is_for_retirement: isForRetirement, note }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (data) await db.investments.put(data);
+  return data;
+};
+
+export const updateInvestment = async (id: string, updates: Partial<DbInvestment>) => {
+  const { data, error } = await getSupabase()
+    .from('investment')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (data) await db.investments.update(id, updates);
+  return data;
+};
+
+export const addInvestmentTrend = async (investmentId: string, month: number, year: number, value: number, cashFlow: number) => {
+  const { data, error } = await getSupabase()
+    .from('investment_trend')
+    .insert([{ 
+      investment_id: investmentId, 
+      month, 
+      year, 
+      value, 
+      cash_flow: cashFlow 
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (data) await db.investmentTrends.put(data);
+  return data;
+};
+
+export const deleteInvestmentTrend = async (id: string) => {
+  const { error } = await getSupabase()
+    .from('investment_trend')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  await db.investmentTrends.delete(id);
+};
+
 
 // --- Transaction & Logic Methods ---
 
