@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCo
         </div>
 
         {/* Actions Section */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <InstallPWA />
           
           <div className="hidden md:flex flex-col items-end border-r border-slate-200/60 pr-4 mr-1">
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({ onSync, isSyncing, transactionCo
             onClick={onSync}
             disabled={isSyncing}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all text-xs sm:text-sm border
+              flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full font-medium transition-all text-xs sm:text-sm border
               ${isSyncing 
                 ? 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed' 
                 : 'bg-white border-slate-200 text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 hover:shadow-sm active:scale-95'}

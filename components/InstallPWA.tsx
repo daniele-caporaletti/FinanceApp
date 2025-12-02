@@ -38,26 +38,14 @@ export const InstallPWA: React.FC<InstallPWAProps> = ({ isMobile }) => {
 
   if (isInstalled || !deferredPrompt) return null;
 
-  if (isMobile) {
-    return (
-      <button
-        onClick={handleInstall}
-        className="flex flex-col items-center justify-center w-full h-full gap-1 text-indigo-600 hover:bg-indigo-50/50"
-      >
-        <Download size={22} strokeWidth={2} />
-        <span className="text-[10px] font-bold">Installa</span>
-      </button>
-    );
-  }
-
   return (
     <button
       onClick={handleInstall}
-      className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-xs font-medium"
+      className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-xs font-medium"
       title="Installa applicazione"
     >
-      <Download size={14} />
-      Install App
+      <Download size={16} className="sm:w-[14px] sm:h-[14px]" />
+      <span className="hidden sm:inline">Install App</span>
     </button>
   );
 };

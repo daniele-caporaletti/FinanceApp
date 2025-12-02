@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import { MegaTransaction, DbAccount } from '../types';
 import { Calendar, TrendingDown, Wallet, Building2, ChevronRight, Folder, ArrowUpRight } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
+import { Activity } from 'lucide-react';
 
 export interface NavigationFilters {
   year: number;
@@ -149,14 +151,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8 pb-10">
+    <div className="flex flex-col gap-4 md:gap-8 pb-safe">
       
       {/* --- Top Row: KPIs + Year Selector --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
         
         {/* Year Selector */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col justify-center gap-3">
-            <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest"><Calendar size={14} /> Anno Fiscale</div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 shadow-sm flex flex-col justify-center gap-2 md:gap-3">
+            <div className="flex items-center gap-2 text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest"><Calendar size={14} /> Anno Fiscale</div>
             <CustomSelect
               value={selectedYear}
               onChange={(val) => setSelectedYear(val)}
@@ -168,27 +170,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Spent This Month */}
         <div 
            onClick={handleSpentThisMonthClick}
-           className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm cursor-pointer hover:shadow-md hover:border-rose-200 transition-all group relative overflow-hidden"
+           className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 shadow-sm cursor-pointer hover:shadow-md hover:border-rose-200 transition-all group relative overflow-hidden active:scale-95"
          >
           <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity text-rose-500 rotate-12 transform scale-125"><TrendingDown size={100} /></div>
-          <div className="flex items-center gap-2 mb-4 text-slate-500 group-hover:text-rose-600 transition-colors text-xs font-bold uppercase tracking-widest">
+          <div className="flex items-center gap-2 mb-2 md:mb-4 text-slate-500 group-hover:text-rose-600 transition-colors text-[10px] md:text-xs font-bold uppercase tracking-widest">
             <span className="p-1 rounded bg-rose-50 text-rose-500"><TrendingDown size={14} /></span> Uscite Var. (Mese)
           </div>
-          <div className="text-3xl font-bold font-mono tracking-tighter text-slate-800">
+          <div className="text-2xl md:text-3xl font-bold font-mono tracking-tighter text-slate-800">
             CHF <span className="text-rose-600">{Math.floor(Math.abs(spentThisMonth)).toLocaleString('en-US')}</span><span className="text-lg text-rose-500">.{Math.abs(spentThisMonth).toFixed(2).split('.')[1]}</span>
           </div>
         </div>
 
-        {/* Net Worth */}
+        {/* Net Worth (Compact on Mobile: p-4 instead of p-6/p-8) */}
         <div 
           onClick={onNavigateToAccounts}
-          className="lg:col-span-2 bg-slate-900 text-white rounded-xl p-8 shadow-xl cursor-pointer relative overflow-hidden group transition-transform active:scale-[0.99]"
+          className="lg:col-span-2 bg-slate-900 text-white rounded-xl p-4 md:p-8 shadow-xl cursor-pointer relative overflow-hidden group transition-transform active:scale-[0.99]"
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
           
-          <div className="relative z-10 flex flex-col justify-between h-full min-h-[120px]">
+          <div className="relative z-10 flex flex-col justify-between h-full min-h-[100px] md:min-h-[120px]">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white/70 text-xs font-bold uppercase tracking-widest">
+              <div className="flex items-center gap-2 text-white/70 text-[10px] md:text-xs font-bold uppercase tracking-widest">
                  <Building2 size={14} /> Patrimonio Netto
               </div>
               <div className="p-2 bg-white/10 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
@@ -196,11 +198,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
             
-            <div className="mt-4">
-              <div className="text-5xl font-bold font-mono tracking-tighter text-white">
-                CHF {Math.floor(netWorthCHF).toLocaleString('en-US')}<span className="text-2xl text-slate-400">.{netWorthCHF.toFixed(2).split('.')[1]}</span>
+            <div className="mt-2 md:mt-4">
+              <div className="text-3xl md:text-5xl font-bold font-mono tracking-tighter text-white">
+                CHF {Math.floor(netWorthCHF).toLocaleString('en-US')}<span className="text-lg md:text-2xl text-slate-400">.{netWorthCHF.toFixed(2).split('.')[1]}</span>
               </div>
-              <p className="text-white/40 text-sm mt-2 font-medium">Totale asset convertiti in valuta base</p>
+              <p className="text-white/40 text-xs md:text-sm mt-1 md:mt-2 font-medium">Totale asset convertiti</p>
             </div>
           </div>
         </div>
@@ -208,14 +210,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* --- Monthly Matrix --- */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+         <div className="px-4 md:px-6 py-3 md:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
             <div className="flex items-center gap-3">
                <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
-                  <Calendar size={20} />
+                  <Calendar size={18} />
                </div>
                <div>
-                 <h3 className="font-bold text-slate-800 text-lg leading-tight">Matrice Annuale</h3>
-                 <p className="text-xs text-slate-400 font-medium">{selectedYear} Overview</p>
+                 <h3 className="font-bold text-slate-800 text-base md:text-lg leading-tight">Matrice Annuale</h3>
+                 <p className="text-[10px] md:text-xs text-slate-400 font-medium">{selectedYear} Overview</p>
                </div>
             </div>
          </div>
@@ -223,44 +225,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <table className="w-full text-left text-sm whitespace-nowrap border-separate border-spacing-0">
                <thead>
                   <tr>
-                     <th className="px-4 py-3 font-bold text-slate-400 uppercase tracking-wider text-[11px] sticky left-0 bg-white z-10 border-b border-slate-100">Mese</th>
-                     <th className="px-4 py-3 font-bold text-rose-500 uppercase tracking-wider text-[11px] text-right border-b border-slate-100">Uscite Var.</th>
-                     <th className="px-4 py-3 font-bold text-amber-500 uppercase tracking-wider text-[11px] text-right border-b border-slate-100">Uscite Fisse</th>
-                     <th className="px-4 py-3 font-bold text-emerald-500 uppercase tracking-wider text-[11px] text-right border-b border-slate-100">Entrate</th>
-                     <th className="px-4 py-3 font-bold text-blue-500 uppercase tracking-wider text-[11px] text-right border-b border-slate-100">Ant. Lavoro</th>
-                     <th className="px-4 py-3 font-bold text-indigo-500 uppercase tracking-wider text-[11px] text-right border-b border-slate-100">Rimb. Lavoro</th>
+                     <th className="px-4 py-3 font-bold text-slate-400 uppercase tracking-wider text-[10px] md:text-[11px] sticky left-0 bg-white z-10 border-b border-slate-100 shadow-sm">Mese</th>
+                     <th className="px-4 py-3 font-bold text-rose-500 uppercase tracking-wider text-[10px] md:text-[11px] text-right border-b border-slate-100">Uscite Var.</th>
+                     <th className="px-4 py-3 font-bold text-amber-500 uppercase tracking-wider text-[10px] md:text-[11px] text-right border-b border-slate-100">Uscite Fisse</th>
+                     <th className="px-4 py-3 font-bold text-emerald-500 uppercase tracking-wider text-[10px] md:text-[11px] text-right border-b border-slate-100">Entrate</th>
+                     <th className="px-4 py-3 font-bold text-blue-500 uppercase tracking-wider text-[10px] md:text-[11px] text-right border-b border-slate-100">Ant. Lavoro</th>
+                     <th className="px-4 py-3 font-bold text-indigo-500 uppercase tracking-wider text-[10px] md:text-[11px] text-right border-b border-slate-100">Rimb. Lavoro</th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
                   {monthlyData.map((data, index) => (
                     <tr key={index} className="hover:bg-indigo-50/30 transition-colors group">
-                       <td className={`px-4 py-3 font-bold text-slate-700 bg-white sticky left-0 z-10 group-hover:bg-indigo-50/50 transition-colors ${selectedMonth === index ? 'text-indigo-600' : ''}`}>
+                       <td className={`px-4 py-3 font-bold text-slate-700 bg-white sticky left-0 z-10 text-xs md:text-sm group-hover:bg-indigo-50/50 transition-colors ${selectedMonth === index ? 'text-indigo-600' : ''}`}>
                          {MONTHS[index]}
                          {selectedMonth === index && <span className="ml-2 w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block align-middle"></span>}
                        </td>
                        
                        <td onClick={() => handleCellClick(index, 'VAR')} className="px-4 py-3 text-right cursor-pointer">
-                          <span className={`px-2 py-1 rounded-lg font-mono transition-colors ${data.variableExpenses !== 0 ? 'text-rose-600 group-hover:bg-rose-100/50' : 'text-slate-300'}`}>
+                          <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.variableExpenses !== 0 ? 'text-rose-600 group-hover:bg-rose-100/50' : 'text-slate-300'}`}>
                             {data.variableExpenses !== 0 ? Math.floor(data.variableExpenses).toLocaleString('en-US') + '.' + data.variableExpenses.toFixed(2).split('.')[1] : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'FIX')} className="px-4 py-3 text-right cursor-pointer">
-                          <span className={`px-2 py-1 rounded-lg font-mono transition-colors ${data.fixedExpenses !== 0 ? 'text-amber-600 group-hover:bg-amber-100/50' : 'text-slate-300'}`}>
+                          <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.fixedExpenses !== 0 ? 'text-amber-600 group-hover:bg-amber-100/50' : 'text-slate-300'}`}>
                             {data.fixedExpenses !== 0 ? Math.floor(data.fixedExpenses).toLocaleString('en-US') + '.' + data.fixedExpenses.toFixed(2).split('.')[1] : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'INC')} className="px-4 py-3 text-right cursor-pointer">
-                          <span className={`px-2 py-1 rounded-lg font-mono transition-colors ${data.income !== 0 ? 'text-emerald-600 group-hover:bg-emerald-100/50' : 'text-slate-300'}`}>
+                          <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.income !== 0 ? 'text-emerald-600 group-hover:bg-emerald-100/50' : 'text-slate-300'}`}>
                             {data.income !== 0 ? `+${Math.floor(data.income).toLocaleString('en-US')}.${data.income.toFixed(2).split('.')[1]}` : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'WORK_ADV')} className="px-4 py-3 text-right cursor-pointer">
-                          <span className={`px-2 py-1 rounded-lg font-mono transition-colors ${data.workAdvances !== 0 ? 'text-blue-600 group-hover:bg-blue-100/50' : 'text-slate-300'}`}>
+                          <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.workAdvances !== 0 ? 'text-blue-600 group-hover:bg-blue-100/50' : 'text-slate-300'}`}>
                             {data.workAdvances !== 0 ? Math.floor(data.workAdvances).toLocaleString('en-US') + '.' + data.workAdvances.toFixed(2).split('.')[1] : '-'}
                           </span>
                        </td>
                        <td onClick={() => handleCellClick(index, 'WORK_REIMB')} className="px-4 py-3 text-right cursor-pointer">
-                          <span className={`px-2 py-1 rounded-lg font-mono transition-colors ${data.workReimbursements !== 0 ? 'text-indigo-600 group-hover:bg-indigo-100/50' : 'text-slate-300'}`}>
+                          <span className={`px-2 py-1 rounded-lg font-mono text-xs md:text-sm transition-colors ${data.workReimbursements !== 0 ? 'text-indigo-600 group-hover:bg-indigo-100/50' : 'text-slate-300'}`}>
                             {data.workReimbursements !== 0 ? `+${Math.floor(data.workReimbursements).toLocaleString('en-US')}.${data.workReimbursements.toFixed(2).split('.')[1]}` : '-'}
                           </span>
                        </td>
@@ -272,19 +274,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* --- Main Content Grid --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           
           {/* --- LEFT COL: Active Accounts (Table Style) --- */}
           <div className="lg:col-span-1 flex flex-col gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              {/* Reduced height on mobile: h-[240px] */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[240px] md:h-[600px]">
+                  <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <Wallet size={20} className="text-indigo-600" /> I Miei Conti
+                      <h3 className="text-base md:text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Wallet size={18} className="text-indigo-600" /> I Miei Conti
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Saldi aggiornati</p>
+                      <p className="text-[10px] md:text-xs text-slate-500 mt-0.5">Saldi aggiornati</p>
                     </div>
-                    <div className="bg-white border border-slate-200 px-3 py-1 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                    <div className="bg-white border border-slate-200 px-2 py-1 md:px-3 md:py-1 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                        {activeAccountBalances.length} Visibili
                     </div>
                   </div>
@@ -293,9 +296,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <table className="w-full text-left border-collapse">
                       <thead className="sticky top-0 bg-white z-10 border-b border-slate-100 shadow-sm">
                         <tr className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                          <th className="px-5 py-3 bg-slate-50/80">Conto</th>
-                          <th className="px-5 py-3 bg-slate-50/80 text-center">Valuta</th>
-                          <th className="px-5 py-3 bg-slate-50/80 text-right">Saldo</th>
+                          <th className="px-4 py-2 md:px-5 md:py-3 bg-slate-50/80">Conto</th>
+                          <th className="px-4 py-2 md:px-5 md:py-3 bg-slate-50/80 text-center">Valuta</th>
+                          <th className="px-4 py-2 md:px-5 md:py-3 bg-slate-50/80 text-right">Saldo</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -308,15 +311,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ) : (
                           activeAccountBalances.map((account) => (
                             <tr key={account.id} className="hover:bg-slate-50 transition-colors group">
-                              <td className="px-5 py-4">
-                                <div className="font-bold text-slate-800 text-sm">{account.name}</div>
+                              <td className="px-4 py-3 md:px-5 md:py-4">
+                                <div className="font-bold text-slate-800 text-xs md:text-sm">{account.name}</div>
                               </td>
-                              <td className="px-5 py-4 text-center">
-                                <span className="inline-block px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold font-mono text-slate-500 border border-slate-200">
+                              <td className="px-4 py-3 md:px-5 md:py-4 text-center">
+                                <span className="inline-block px-1.5 py-0.5 md:px-2 md:py-0.5 bg-slate-100 rounded text-[9px] md:text-[10px] font-bold font-mono text-slate-500 border border-slate-200">
                                   {account.currency}
                                 </span>
                               </td>
-                              <td className={`px-5 py-4 text-right font-mono font-bold text-sm ${account.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                              <td className={`px-4 py-3 md:px-5 md:py-4 text-right font-mono font-bold text-xs md:text-sm ${account.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                                 {account.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -330,28 +333,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* --- RIGHT COL: Monthly Analysis --- */}
           <div className="lg:col-span-2 flex flex-col gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
+              {/* Reduced height on mobile: h-[300px] */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[300px] md:h-[600px]">
                   {/* Header with Month Selector */}
-                  <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 bg-slate-50/50">
+                  <div className="p-4 md:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 md:gap-4 shrink-0 bg-slate-50/50">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
-                          <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><Folder size={20} /></div>
+                          <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><Folder size={18} /></div>
                           <div>
-                             <h3 className="font-bold text-slate-800 text-lg">Analisi Spese</h3>
-                             <p className="text-xs text-slate-400 font-medium">Breakdown {selectedYear}</p>
+                             <h3 className="font-bold text-slate-800 text-base md:text-lg">Analisi Spese</h3>
+                             <p className="text-[10px] md:text-xs text-slate-400 font-medium">Breakdown {selectedYear}</p>
                           </div>
                       </div>
                       
                       <div className="flex items-center gap-4 w-full sm:w-auto">
-                          <div className="w-40">
+                          <div className="w-full sm:w-40">
                             <CustomSelect
                               value={selectedMonth}
                               onChange={setSelectedMonth}
                               options={MONTHS.map((m, i) => ({ value: i, label: m }))}
                             />
                           </div>
-                          <div className="flex flex-col items-end min-w-[120px]">
+                          <div className="flex flex-col items-end min-w-[100px] md:min-w-[120px]">
                              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Totale Uscite</div>
-                             <div className="font-mono font-bold text-lg text-rose-600 tracking-tight">
+                             <div className="font-mono font-bold text-base md:text-lg text-rose-600 tracking-tight">
                                  CHF {Math.floor(monthlyBreakdown.total).toLocaleString('en-US')}.{monthlyBreakdown.total.toFixed(2).split('.')[1]}
                              </div>
                           </div>
@@ -366,31 +370,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
                              <p>Nessuna uscita registrata.</p>
                           </div>
                       ) : (
-                          <div className="divide-y divide-slate-50 p-2">
+                          <div className="divide-y divide-slate-50 p-1 md:p-2">
                               {monthlyBreakdown.categories.map(([catName, data]) => (
-                                  <div key={catName} className="p-4 rounded-xl hover:bg-slate-50/50 transition-all border border-transparent hover:border-slate-100 mb-1">
+                                  <div key={catName} className="p-3 md:p-4 rounded-xl hover:bg-slate-50/50 transition-all border border-transparent hover:border-slate-100 mb-1">
                                       {/* Category Header */}
-                                      <div className="flex justify-between items-center mb-3">
-                                          <div className="flex items-center gap-3">
-                                              <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold text-sm">
+                                      <div className="flex justify-between items-center mb-2 md:mb-3">
+                                          <div className="flex items-center gap-2 md:gap-3">
+                                              <div className="w-7 h-7 md:w-8 md:h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold text-xs md:text-sm">
                                                   {catName.charAt(0)}
                                               </div>
-                                              <div>
-                                                 <div className="font-bold text-slate-700 text-sm">{catName}</div>
-                                                 <div className="h-1 w-24 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                              <div className="flex-1 min-w-0">
+                                                 <div className="font-bold text-slate-700 text-xs md:text-sm truncate">{catName}</div>
+                                                 <div className="h-1 w-16 md:w-24 bg-slate-100 rounded-full mt-1 overflow-hidden">
                                                     <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min((data.total / monthlyBreakdown.total) * 100, 100)}%` }}></div>
                                                  </div>
                                               </div>
                                           </div>
-                                          <span className="font-mono font-bold text-slate-800 text-sm">
+                                          <span className="font-mono font-bold text-slate-800 text-xs md:text-sm">
                                               {data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                           </span>
                                       </div>
 
                                       {/* Subcategories */}
-                                      <div className="pl-11 space-y-2">
+                                      <div className="pl-9 md:pl-11 space-y-1.5 md:space-y-2">
                                           {Array.from(data.subcategories.entries()).map(([subName, amount]) => (
-                                              <div key={subName} className="flex justify-between items-center text-xs text-slate-500 group py-1 border-b border-slate-50 last:border-0">
+                                              <div key={subName} className="flex justify-between items-center text-[10px] md:text-xs text-slate-500 group py-1 border-b border-slate-50 last:border-0">
                                                   <span className="group-hover:text-indigo-600 transition-colors font-medium flex items-center gap-1">
                                                     <div className="w-1 h-1 rounded-full bg-slate-300 group-hover:bg-indigo-400 transition-colors"></div>
                                                     {subName}
@@ -409,6 +413,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
           </div>
       </div>
+
+      {/* Spacing for mobile nav */}
+      <div className="h-4 md:hidden"></div>
 
     </div>
   );

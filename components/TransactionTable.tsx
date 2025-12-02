@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MegaTransaction } from '../types';
-import { AlertCircle, Check, X, Trash2, Pencil, Calendar, Wallet, Tag } from 'lucide-react';
+import { AlertCircle, Check, X, Trash2, Pencil, Calendar, Wallet, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface TransactionTableProps {
   transactions: MegaTransaction[];
@@ -15,6 +15,9 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   onEdit,
   onDelete
 }) => {
+  // Mobile: Track expanded state for details if needed, though we aim for compact
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (isLoading) {
     return (
       <div className="w-full h-96 flex flex-col items-center justify-center text-slate-400">
@@ -36,62 +39,80 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
     );
   }
 
-  // --- MOBILE CARD VIEW ---
-  const MobileCard = ({ tx }: { tx: MegaTransaction }) => (
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4 relative active:scale-[0.99] transition-transform">
-       {/* Header: Date & Amount */}
-       <div className="flex justify-between items-start">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wide bg-slate-50 px-2 py-1 rounded-lg">
-             <Calendar size={12} />
-             {new Date(tx.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </div>
-          <div className={`font-mono font-bold text-lg tracking-tight ${tx.amount_base < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-             CHF {tx.amount_base.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-       </div>
+  // --- MOBILE CARD VIEW (COMPACT) ---
+  const MobileCard = ({ tx }: { tx: MegaTransaction }) => {
+    const isExpanded = expandedId === tx.id;
+    const dateObj = new Date(tx.date);
+    
+    return (
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden transition-all active:scale-[0.99]">
+         {/* Main Compact Row */}
+         <div 
+           className="p-3 flex items-center justify-between gap-3 cursor-pointer"
+           onClick={() => setExpandedId(isExpanded ? null : tx.id)}
+         >
+            {/* Left: Icon & Category */}
+            <div className="flex items-center gap-3 overflow-hidden flex-1">
+               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold 
+                  ${tx.amount_base < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                  {tx.category_name.charAt(0)}
+               </div>
+               <div className="flex flex-col overflow-hidden">
+                  <span className="font-bold text-slate-800 text-sm truncate leading-tight">
+                    {tx.category_name}
+                  </span>
+                  <div className="flex items-center gap-1 text-xs text-slate-500 truncate mt-0.5">
+                    <span className="truncate">{tx.subcategory_name !== '-' ? tx.subcategory_name : 'Generale'}</span>
+                    {tx.tag && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1 rounded font-medium">#{tx.tag}</span>}
+                  </div>
+               </div>
+            </div>
 
-       {/* Main Info */}
-       <div>
-          <div className="font-bold text-slate-800 text-lg leading-snug">{tx.category_name}</div>
-          <div className="text-sm text-slate-500 flex flex-wrap items-center gap-2 mt-1">
-             <span>{tx.subcategory_name !== '-' ? tx.subcategory_name : 'Generale'}</span>
-             {tx.tag && (
-               <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
-                 #{tx.tag}
+            {/* Right: Amount & Date */}
+            <div className="flex flex-col items-end shrink-0">
+               <span className={`font-mono font-bold text-sm leading-tight ${tx.amount_base < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
+                  {tx.amount_base < 0 ? '-' : '+'} {Math.abs(tx.amount_base).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                </span>
-             )}
-          </div>
-       </div>
+               <span className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {dateObj.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}
+               </span>
+            </div>
+         </div>
 
-       {/* Account & Note */}
-       <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-          <div className="bg-white p-1 rounded-full shadow-sm"><Wallet size={12} className="text-slate-400" /></div>
-          <span className="font-semibold text-slate-700">{tx.account_name}</span>
-          {tx.note && (
-            <>
-               <span className="text-slate-300">|</span>
-               <span className="truncate italic max-w-[150px]">{tx.note}</span>
-            </>
-          )}
-       </div>
-
-       {/* Actions (Absolute Bottom Right) */}
-       <div className="absolute bottom-5 right-5 flex gap-2">
-          <button 
-            onClick={() => onEdit(tx)}
-            className="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 active:scale-90 transition-all shadow-sm"
-          >
-            <Pencil size={14} />
-          </button>
-          <button 
-            onClick={() => onDelete(tx.id)}
-            className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-full hover:bg-red-100 active:scale-90 transition-all shadow-sm"
-          >
-            <Trash2 size={14} />
-          </button>
-       </div>
-    </div>
-  );
+         {/* Expanded Actions & Details */}
+         {isExpanded && (
+           <div className="px-3 pb-3 pt-0 animate-in slide-in-from-top-2 duration-200">
+              <div className="border-t border-slate-50 pt-2 mb-3 flex flex-col gap-1">
+                 <div className="flex justify-between text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><Wallet size={10} /> {tx.account_name}</span>
+                    <span className="font-mono">{tx.amount_original.toLocaleString()} {tx.currency}</span>
+                 </div>
+                 {tx.note && (
+                   <p className="text-xs text-slate-400 italic bg-slate-50 p-1.5 rounded mt-1">
+                     "{tx.note}"
+                   </p>
+                 )}
+              </div>
+              
+              <div className="flex gap-2">
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onEdit(tx); }}
+                   className="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold flex items-center justify-center gap-2 active:bg-indigo-100"
+                 >
+                   <Pencil size={14} /> Modifica
+                 </button>
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onDelete(tx.id); }}
+                   className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold flex items-center justify-center gap-2 active:bg-red-100"
+                 >
+                   <Trash2 size={14} /> Elimina
+                 </button>
+              </div>
+           </div>
+         )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -150,13 +171,16 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
         </div>
       </div>
 
-      {/* --- MOBILE LIST VIEW (Cards) --- */}
-      <div className="md:hidden flex flex-col gap-3 pb-safe">
+      {/* --- MOBILE LIST VIEW (Compact Cards) --- */}
+      <div className="md:hidden flex flex-col gap-2 pb-safe">
          <div className="px-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 flex justify-between items-center">
-            <span>Lista Transazioni</span>
-            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{transactions.length}</span>
+            <span>Ultimi Movimenti</span>
+            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-mono">{transactions.length}</span>
          </div>
          {transactions.map(tx => <MobileCard key={tx.id} tx={tx} />)}
+         
+         {/* Extra padding at bottom for FAB and Nav */}
+         <div className="h-24"></div>
       </div>
     </>
   );
