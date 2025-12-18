@@ -1,7 +1,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-// Funzione helper per leggere le variabili d'ambiente in modo sicuro in qualsiasi ambiente (Vite, CRA, o browser raw).
+// Funzione helper per leggere le variabili d'ambiente in modo sicuro in qualsiasi ambiente.
 const getEnv = (key: string, fallback: string = ''): string => {
   // 1. Prova a leggere da process.env (Node.js / CRA / Webpack)
   try {
@@ -30,8 +30,6 @@ const getEnv = (key: string, fallback: string = ''): string => {
 // Utilizziamo le chiavi standard Supabase
 const supabaseUrl = getEnv('SUPABASE_URL', 'https://zofiedtdignlsjyzsdge.supabase.co');
 
-// CHANGE: Ripristinata la logica per accettare REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY
-// e inserito il valore hardcoded come fallback finale per garantire il funzionamento immediato come richiesto.
 const supabaseKey = 
   getEnv('SUPABASE_ANON_KEY') || 
   getEnv('SUPABASE_KEY') || 

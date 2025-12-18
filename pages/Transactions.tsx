@@ -5,6 +5,7 @@ import { useNavigation } from '../NavigationContext';
 import { Transaction, Category, Account } from '../types';
 import { fetchExchangeRate } from '../utils/helpers';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 interface FilterState {
   search: string;
@@ -119,11 +120,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
 export const Transactions: React.FC = () => {
   const { transactions, categories, accounts, addTransaction, updateTransaction, deleteTransaction } = useFinance();
-  const { navigationParams, navigateTo } = useNavigation();
+  const { navigationParams } = useNavigation();
   
   const currentYear = new Date().getFullYear().toString();
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Transaction> }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; tx?: Transaction }>({ open: false });
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   // Stato per la visibilità dei filtri
   const [showFilters, setShowFilters] = useState(false);
@@ -137,13 +139,16 @@ export const Transactions: React.FC = () => {
 
   useEffect(() => {
     if (navigationParams) {
-      setFilters(prev => ({
-        ...prev,
-        ...navigationParams,
-      }));
-      navigateTo('movimenti' as any, null);
+      if (navigationParams.openNew) {
+         setModalState({ open: true, initialData: undefined });
+      } else {
+         setFilters(prev => ({
+           ...prev,
+           ...navigationParams,
+         }));
+      }
     }
-  }, [navigationParams, navigateTo]);
+  }, [navigationParams]);
 
   const availableYears = useMemo(() => {
     const years = transactions.map(t => new Date(t.occurred_on).getFullYear());
@@ -216,6 +221,18 @@ export const Transactions: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
+      {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Movimenti</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
       <div className="flex flex-col xl:flex-row gap-4 items-stretch">
         <div className="relative flex-1">
           <input type="text" placeholder="Cerca..." className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-medium outline-none focus:border-blue-500 shadow-sm" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} />
@@ -227,7 +244,6 @@ export const Transactions: React.FC = () => {
                 {availableYears.map(y => <button key={y} onClick={() => setFilters(f => ({ ...f, year: y }))} className={`px-6 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${filters.year === y ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>{y}</button>)}
             </div>
             
-            {/* Pulsante Toggle Filtri */}
             <button 
                 onClick={() => setShowFilters(!showFilters)} 
                 className={`px-5 py-4 border rounded-2xl font-bold flex items-center space-x-2 transition-all whitespace-nowrap ${showFilters ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
@@ -414,6 +430,39 @@ export const Transactions: React.FC = () => {
         confirmText="Elimina"
         isDangerous={true}
       />
+      
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Gestione Movimenti"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+               <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                  Questa sezione è il registro completo delle tue finanze. Qui puoi aggiungere, modificare e categorizzare ogni singola transazione.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Funzionalità</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Ricerca Globale:</span> Trova movimenti per descrizione, tag o importo.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Filtri Avanzati:</span> Usa il tasto "Filtri" per segmentare per conto, categoria, tipo (es. Entrate/Uscite) o periodo specifico.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Multi-valuta:</span> Se inserisci un importo in EUR o USD, verrà convertito automaticamente in CHF usando il tasso di cambio storico del giorno.</p>
+                 </li>
+              </ul>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

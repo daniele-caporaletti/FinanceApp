@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
 import { AppSection } from '../types';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 export const Dashboard: React.FC = () => {
   const { transactions, accounts, investments, investmentTrends } = useFinance();
@@ -12,6 +13,7 @@ export const Dashboard: React.FC = () => {
   const currentMonthIndex = new Date().getMonth(); 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+  const [isInfoOpen, setIsInfoOpen] = useState(false); // Stato per il modale Info
 
   const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 
@@ -139,7 +141,15 @@ export const Dashboard: React.FC = () => {
       {/* Header Minimal */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Financial Overview</h2>
+           <div className="flex items-center gap-3">
+               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Financial Overview</h2>
+               <button 
+                  onClick={() => setIsInfoOpen(true)}
+                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+               >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               </button>
+           </div>
            <p className="text-slate-400 font-medium mt-1 text-sm md:text-base">Benvenuto nella tua dashboard finanziaria.</p>
         </div>
         <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 flex items-center space-x-2 self-start md:self-auto">
@@ -315,6 +325,67 @@ export const Dashboard: React.FC = () => {
             );
         })}
       </div>
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Informazioni App"
+        subtitle="Version 1.2.0"
+      >
+        <div className="space-y-8">
+            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                <h4 className="text-sm font-bold text-slate-900 mb-2">FinanceWeb OS</h4>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                    Un sistema completo per la gestione delle finanze personali, progettato per tracciare entrate, uscite, investimenti e patrimonio netto in modo semplice e intuitivo.
+                </p>
+            </div>
+
+            <div>
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Funzionalità Principali</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start space-x-3">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 3.666V19a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2h4.5A2.5 2.5 0 0112 4.5V7" /></svg>
+                        </div>
+                        <div>
+                            <h5 className="text-sm font-bold text-slate-800">Tracciamento Spese</h5>
+                            <p className="text-xs text-slate-400 mt-0.5">Categorizzazione automatica e manuale di ogni transazione.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        </div>
+                        <div>
+                            <h5 className="text-sm font-bold text-slate-800">Investimenti</h5>
+                            <p className="text-xs text-slate-400 mt-0.5">Monitoraggio ROI e performance dei fondi personali e pensionistici.</p>
+                        </div>
+                    </div>
+                     <div className="flex items-start space-x-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div>
+                            <h5 className="text-sm font-bold text-slate-800">Multi-Valuta</h5>
+                            <p className="text-xs text-slate-400 mt-0.5">Supporto nativo per CHF, EUR e USD con conversione automatica.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Note Legali & Privacy</h4>
+                 <p className="text-xs text-slate-500 leading-relaxed">
+                    Questa applicazione è ad uso strettamente personale. I dati sono salvati su database Supabase privato e protetto da RLS (Row Level Security). Nessun dato viene condiviso con terze parti.
+                 </p>
+            </div>
+
+             <div className="pt-8 border-t border-slate-50 text-center">
+                <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Designed for You</p>
+            </div>
+        </div>
+      </FullScreenModal>
+
     </div>
   );
 };

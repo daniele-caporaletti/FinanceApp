@@ -2,9 +2,10 @@
 import React, { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell, AreaChart, Area 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell 
 } from 'recharts';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
@@ -14,12 +15,12 @@ export const Analysis: React.FC = () => {
   
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all');
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   // Stato per gestire l'espansione delle sottocategorie nel dettaglio
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
 
   const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
-  const fullMonthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 
   const toggleDetail = (categoryName: string) => {
     setExpandedDetails(prev => {
@@ -200,7 +201,18 @@ export const Analysis: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20 w-full overflow-hidden">
       
-      {/* Controls Bar - Robusta struttura per overflow */}
+       {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Analisi</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
+      {/* Controls Bar */}
       <div className="bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm w-full">
          <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
             {/* Year Selector Wrapper */}
@@ -397,6 +409,39 @@ export const Analysis: React.FC = () => {
               </div>
           </div>
       </div>
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Report Finanziario"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+               <p className="text-sm text-indigo-800 leading-relaxed font-medium">
+                  Questa dashboard ti aiuta a capire dove vanno i tuoi soldi e quanto stai risparmiando.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Dettagli Calcoli</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">I movimenti classificati come <span className="font-bold text-slate-900">Work</span> (rimborsi spese) e <span className="font-bold text-slate-900">Transfer</span> (giroconti) sono <strong>esclusi</strong> da questi grafici per non falsare il calcolo delle spese nette.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Il <strong>Savings Rate</strong> è calcolato come: <em className="text-slate-500">(Entrate - Uscite) / Entrate</em>.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Le spese sono convertite in CHF alla data del movimento.</p>
+                 </li>
+              </ul>
+           </div>
+        </div>
+      </FullScreenModal>
 
     </div>
   );

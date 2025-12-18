@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Category } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 interface CategoryModalProps {
   isOpen: boolean;
@@ -77,6 +78,7 @@ export const Categories: React.FC = () => {
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Category>; parentId?: string | null }>({ open: false });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; item?: Category; isUsed: boolean }>({ open: false, isUsed: false });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const hierarchicalCategories = useMemo(() => {
     const main = categories.filter(c => !c.parent_id);
@@ -126,6 +128,17 @@ export const Categories: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
+      {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Categorie</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
       {/* Stats Bar */}
       <div className="flex flex-wrap gap-4 items-center">
         <div className="flex items-center space-x-6 px-6 py-4 bg-white border border-slate-200 rounded-2xl shadow-sm w-full md:w-auto justify-between md:justify-start">
@@ -347,6 +360,35 @@ export const Categories: React.FC = () => {
         confirmText={deleteModal.isUsed ? 'Chiudi' : 'Sì, Elimina'}
         isDangerous={!deleteModal.isUsed}
       />
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Gestione Categorie"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  Le categorie ti permettono di organizzare le tue spese in gruppi logici per avere statistiche più precise.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Struttura</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Categorie Principali:</span> Sono i macro-gruppi (es. Casa, Trasporti, Svago).</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Sottocategorie:</span> Dettagliano la spesa (es. Casa -> Affitto, Casa -> Bollette). Puoi creare sottocategorie cliccando il tasto "+" accanto a una categoria principale.</p>
+                 </li>
+              </ul>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

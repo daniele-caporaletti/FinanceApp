@@ -4,6 +4,7 @@ import { useFinance } from '../FinanceContext';
 import { RecurringTransaction, Category, Account, Transaction } from '../types';
 import { fetchExchangeRate } from '../utils/helpers';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 interface RecurrenceModalProps {
   isOpen: boolean;
@@ -167,6 +168,7 @@ export const Recurrences: React.FC = () => {
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<RecurringTransaction> }>({ open: false });
   const [genModal, setGenModal] = useState<{ open: boolean; recurrence?: RecurringTransaction; defaultDate: string }>({ open: false, defaultDate: '' });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; rec?: RecurringTransaction }>({ open: false });
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // Ordina ricorrenze per nome
   const sortedRecurrences = useMemo(() => {
@@ -268,6 +270,18 @@ export const Recurrences: React.FC = () => {
       {/* Header e Selettore Anno */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-6">
          <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
+               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Ricorrenze</h2>
+               <button 
+                  onClick={() => setIsInfoOpen(true)}
+                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+               >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               </button>
+            </div>
+            
+            <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block"></div>
+
             <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex items-center">
                  {availableYears.map(y => (
                      <button 
@@ -484,6 +498,39 @@ export const Recurrences: React.FC = () => {
         confirmText="Elimina"
         isDangerous={true}
       />
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Gestione Ricorrenze"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  Le ricorrenze servono a pianificare spese fisse mensili (es. affitto, abbonamenti) e controllarne il pagamento.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Come Funziona</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Creazione Template:</span> Crea una ricorrenza definendo importo, giorno del mese e categoria.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Generazione:</span> Ogni mese, clicca sul pallino corrispondente nella griglia per generare il movimento reale. Il pallino diventerà verde.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Stato:</span> Se il pallino è verde, significa che esiste un movimento nei "Movimenti" con lo stesso nome nel mese corrente.</p>
+                 </li>
+              </ul>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

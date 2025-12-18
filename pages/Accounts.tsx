@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Account } from '../types';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -116,6 +117,7 @@ export const Accounts: React.FC = () => {
   const { accounts, transactions, updateAccount, addAccount } = useFinance();
   const [showInactive, setShowInactive] = useState(false);
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Account> }>({ open: false });
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const calculateBalance = (accountId: string) => {
     return transactions
@@ -150,6 +152,18 @@ export const Accounts: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
+      {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Conti</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
       {/* Upper Control Bar */}
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
         <div className="flex items-center p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm w-full lg:w-auto">
@@ -310,6 +324,35 @@ export const Accounts: React.FC = () => {
         onSave={handleSaveAccount}
         initialData={modalState.initialData}
       />
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Gestione Conti"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  Qui puoi gestire i conti su cui vengono registrate le transazioni (es. Conto Corrente, Carta di Credito, Revolut).
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Note Importanti</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Patrimonio Attivo:</span> È la somma dei saldi di tutti i conti <strong>attivi</strong>. Se archivi un conto, il suo saldo non verrà più conteggiato nel totale in alto, ma lo storico movimenti rimarrà salvo.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">In Overview:</span> L'opzione "Mostra in Overview" determina se il conto contribuisce al calcolo del "Patrimonio Spendibile" nella Dashboard principale. Utile per escludere conti deposito vincolati o carte prepagate temporanee.</p>
+                 </li>
+              </ul>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

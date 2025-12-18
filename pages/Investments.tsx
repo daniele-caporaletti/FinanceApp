@@ -3,6 +3,10 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Investment, InvestmentTrend } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { FullScreenModal } from '../components/FullScreenModal';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
+} from 'recharts';
 
 interface ProcessedTrend extends InvestmentTrend {
   totalInvested: number;
@@ -109,7 +113,7 @@ const InvestmentModal: React.FC<InvestmentModalProps> = ({ isOpen, onClose, onSa
             <textarea 
               rows={3}
               className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 resize-none"
-              placeholder="Dettagli aggiuntivi..."
+              placeholder="Dettagli aggiuntivi (es. ISIN, Strategia)..."
               value={formData.note || ''}
               onChange={e => setFormData(f => ({ ...f, note: e.target.value }))}
             />
@@ -235,6 +239,25 @@ const TrendModal: React.FC<TrendModalProps> = ({ isOpen, onClose, onSave, initia
   );
 };
 
+// --- CHART TOOLTIP ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl">
+        <p className="text-xs font-bold text-slate-400 uppercase mb-2">{new Date(label).toLocaleDateString('it-IT')}</p>
+        {payload.map((entry: any, index: number) => (
+           <div key={index} className="text-xs font-bold flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }}></div>
+              <span className="text-slate-600">{entry.name}:</span>
+              <span className="text-slate-900">{entry.value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+           </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const Investments: React.FC = () => {
   const { 
     investments, 
@@ -245,13 +268,12 @@ export const Investments: React.FC = () => {
   
   const [selectedInvestmentId, setSelectedInvestmentId] = useState<string | null>(null);
   
-  // Stati per i modali
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Investment> }>({ open: false });
   const [trendModal, setTrendModal] = useState<{ open: boolean; initialData?: Partial<InvestmentTrend> }>({ open: false });
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; item?: Investment; isTrend?: boolean; trendId?: string }>({ open: false });
 
-  // Helper per separare gli investimenti
   const { retirement, personal } = useMemo(() => {
     return {
       retirement: investments.filter(i => i.is_for_retirement),
@@ -259,18 +281,12 @@ export const Investments: React.FC = () => {
     };
   }, [investments]);
 
-  // Calcola statistiche per SINGOLO investimento
   const calculateInvestmentStats = (invId: string) => {
     const trends = investmentTrends.filter(t => t.investment_id === invId);
     if (trends.length === 0) return null;
 
-    // Ordina cronologicamente
     const sortedTrends = trends.sort((a,b) => new Date(a.value_on).getTime() - new Date(b.value_on).getTime());
-    
-    // Ultima rilevazione per valore attuale e data
     const latest = sortedTrends[sortedTrends.length - 1];
-
-    // Somma tutti i cash flow
     const totalInvested = sortedTrends.reduce((sum, t) => sum + (t.cash_flow || 0), 0);
     const netGain = (latest.value_original || 0) - totalInvested;
     const roi = totalInvested !== 0 ? (netGain / totalInvested) * 100 : 0;
@@ -284,7 +300,6 @@ export const Investments: React.FC = () => {
     };
   };
 
-  // Calcola statistiche aggregate per un gruppo di investimenti
   const calculateGroupStats = (groupInvestments: Investment[]) => {
     let totalValue = 0;
     let totalInvested = 0;
@@ -306,7 +321,6 @@ export const Investments: React.FC = () => {
   const retirementStats = useMemo(() => calculateGroupStats(retirement), [retirement, investmentTrends]);
   const personalStats = useMemo(() => calculateGroupStats(personal), [personal, investmentTrends]);
 
-  // Logica per processare i trend per la vista di dettaglio
   const processedTrends = useMemo(() => {
     if (!selectedInvestmentId) return [];
     
@@ -349,11 +363,12 @@ export const Investments: React.FC = () => {
     return calculated.reverse();
   }, [selectedInvestmentId, investmentTrends]);
 
+  const chartData = useMemo(() => [...processedTrends].reverse(), [processedTrends]);
+
   const selectedInvestment = useMemo(() => 
     investments.find(i => i.id === selectedInvestmentId), 
   [selectedInvestmentId, investments]);
 
-  // Handler azioni Investimento
   const handleSaveInvestment = async (payload: Partial<Investment>) => {
     if (payload.id) {
       await updateInvestment(payload.id, payload);
@@ -382,7 +397,62 @@ export const Investments: React.FC = () => {
     setDeleteDialog({ open: false });
   };
 
-  // Vista Dettaglio
+  // --- COMPONENT: CARD INVESTIMENTO MIGLIORATA ---
+  const InvestmentCard = ({ inv }: { inv: Investment }) => {
+    const stats = calculateInvestmentStats(inv.id);
+    
+    return (
+      <div 
+        onClick={() => setSelectedInvestmentId(inv.id)}
+        className="bg-white rounded-[2rem] shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden h-full flex flex-col"
+      >
+        {/* Actions (Hidden by default) */}
+        <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+           <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: inv }); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+           <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, item: inv, isTrend: false }); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+        </div>
+
+        <div className="p-6 pb-4 flex-1">
+            <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors truncate pr-12">{inv.name}</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded inline-block">{inv.currency} Asset</span>
+        </div>
+
+        {stats ? (
+            <div className="px-6 pb-6 space-y-4">
+                <div className="flex justify-between items-end border-b border-slate-50 pb-3">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Attuale</span>
+                        <span className="text-xl font-black text-slate-900">{stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                        </span>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Versato</span>
+                        <span className="text-sm font-bold text-slate-600">{stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Profitto</span>
+                        <span className={`text-sm font-bold ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div className="px-6 pb-6 flex-1 flex items-center justify-center">
+                <span className="text-xs text-slate-400 italic font-medium">Nessuna rilevazione</span>
+            </div>
+        )}
+      </div>
+    );
+  };
+
+  // --- VISTA DETTAGLIO ---
   if (selectedInvestment && selectedInvestmentId) {
     const latest = processedTrends[0] || { 
       value_original: 0, 
@@ -393,16 +463,17 @@ export const Investments: React.FC = () => {
     
     return (
       <div className="space-y-6 md:space-y-8 animate-in slide-in-from-right-4 duration-500 pb-20">
+        {/* Header Dettaglio */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => setSelectedInvestmentId(null)}
-              className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+              className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </button>
             <div className="min-w-0">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 truncate">{selectedInvestment.name}</h2>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 truncate tracking-tight">{selectedInvestment.name}</h2>
               <div className="flex items-center space-x-2 mt-1">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedInvestment.currency}</span>
                 {selectedInvestment.is_for_retirement && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase rounded">Previdenza</span>}
@@ -412,55 +483,128 @@ export const Investments: React.FC = () => {
           <div className="flex items-center space-x-3 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm self-start md:self-auto">
              <button 
                 onClick={() => setTrendModal({ open: true })}
-                className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-blue-100 transition-all flex items-center space-x-2"
+                className="px-5 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wide hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-lg shadow-blue-200"
              >
                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
                <span>Rilevazione</span>
              </button>
-             <div className="w-px h-6 bg-slate-100"></div>
              <button 
                 onClick={() => setModalState({ open: true, initialData: selectedInvestment })}
-                className="px-4 py-2 text-slate-400 hover:text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wide transition-all flex items-center space-x-2"
+                className="p-3 text-slate-400 hover:text-slate-700 rounded-xl transition-all"
              >
-               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-               <span className="hidden md:inline">Config</span>
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
              </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Attuale</span>
+        {/* Info / Note Section (New) */}
+        {selectedInvestment.note && (
+            <div className="bg-slate-50 px-6 py-4 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="text-sm text-slate-600 font-medium leading-relaxed">{selectedInvestment.note}</p>
+            </div>
+        )}
+
+        {/* 4 KPI Compact */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Attuale</span>
             <div className="text-xl md:text-2xl font-black text-slate-900 mt-1 truncate">
-              {(latest.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-slate-400 hidden md:inline">{selectedInvestment.currency}</span>
+              {(latest.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Versato</span>
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Versato</span>
             <div className="text-xl md:text-2xl font-black text-slate-700 mt-1 truncate">
               {(latest.totalInvested ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guadagno Netto</span>
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guadagno Netto</span>
             <div className={`text-xl md:text-2xl font-black mt-1 truncate ${latest.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {latest.netGain > 0 ? '+' : ''}{(latest.netGain ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI Totale</span>
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI Totale</span>
             <div className={`text-xl md:text-2xl font-black mt-1 truncate ${latest.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {latest.totalRoi > 0 ? '+' : ''}{(latest.totalRoi ?? 0).toFixed(2)}%
             </div>
           </div>
         </div>
 
+        {/* GRAFICO AREA CHART */}
+        {chartData.length > 1 && (
+            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 h-[320px] w-full flex flex-col">
+                <div className="flex justify-between items-center mb-4 px-2">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Analisi Performance</h3>
+                    <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-slate-400"></span><span className="text-[10px] font-bold text-slate-500 uppercase">Versato</span></div>
+                        <div className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500"></span><span className="text-[10px] font-bold text-slate-500 uppercase">Valore</span></div>
+                    </div>
+                </div>
+                <div className="flex-1 w-full min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorInvested" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis 
+                                dataKey="value_on" 
+                                tickFormatter={(str) => new Date(str).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} 
+                                dy={10} 
+                                minTickGap={30}
+                            />
+                            <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                                tickFormatter={(value) => `${value / 1000}k`} 
+                            />
+                            <RechartsTooltip content={<CustomTooltip />} />
+                            <Area 
+                                type="monotone" 
+                                dataKey="value_original" 
+                                name="Valore"
+                                stroke="#10b981" 
+                                strokeWidth={3}
+                                fillOpacity={1} 
+                                fill="url(#colorValue)" 
+                            />
+                            <Area 
+                                type="stepAfter" 
+                                dataKey="totalInvested" 
+                                name="Versato"
+                                stroke="#94a3b8" 
+                                strokeDasharray="5 5"
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorInvested)" 
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {/* TABELLA STORICO */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
           <div className="px-6 md:px-8 py-5 bg-[#fcfdfe] border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Storico Performance</h3>
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Storico Dati</h3>
           </div>
           
-          {/* VISTA DESKTOP: TABELLA */}
+          {/* VISTA DESKTOP */}
           <div className="hidden md:block overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead>
@@ -495,7 +639,7 @@ export const Investments: React.FC = () => {
                     <td className={`px-6 py-4 text-right text-sm font-black ${trend.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {trend.totalRoi > 0 ? '+' : ''}{(trend.totalRoi ?? 0).toFixed(2)}%
                     </td>
-                    <td className="px-6 py-4 text-right space-x-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <td className="px-6 py-4 text-right space-x-1">
                       <button 
                         onClick={() => setTrendModal({ open: true, initialData: trend })}
                         className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -517,7 +661,7 @@ export const Investments: React.FC = () => {
             </table>
           </div>
 
-          {/* VISTA MOBILE: LISTA VERTICALE */}
+          {/* VISTA MOBILE */}
           <div className="md:hidden">
              {processedTrends.map((trend) => (
                 <div key={trend.id} className="p-5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
@@ -598,66 +742,20 @@ export const Investments: React.FC = () => {
     );
   }
 
-  // Vista Dashboard (Lista Card)
-  const InvestmentCard = ({ inv }: { inv: Investment }) => {
-    const stats = calculateInvestmentStats(inv.id);
-    
-    return (
-      <div 
-        onClick={() => setSelectedInvestmentId(inv.id)}
-        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden h-full"
-      >
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity z-0">
-           <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-        </div>
-        
-        <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-           <button 
-             onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: inv }); }}
-             className="p-1.5 bg-white rounded-lg shadow-sm text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100"
-           >
-             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-           </button>
-           <button 
-             onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, item: inv, isTrend: false }); }}
-             className="p-1.5 bg-white rounded-lg shadow-sm text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100"
-           >
-             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-           </button>
-        </div>
-
-        <div className="relative z-10 flex flex-col h-full justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors truncate pr-12">{inv.name}</h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded">{inv.currency}</span>
-              {stats && (
-                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                    ROI: {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
-                 </span>
-              )}
-            </div>
-          </div>
-          
-          <div className="mt-6 pt-4 border-t border-slate-50">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Attuale</span>
-            <div className="text-2xl font-black text-slate-900 mt-0.5">
-              {stats ? (stats.latestValue ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'} 
-              <span className="text-sm font-medium text-slate-400 ml-1">{inv.currency}</span>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-2">
-               {stats ? `Agg: ${new Date(stats.lastDate).toLocaleDateString('it-IT')}` : 'Nessun dato'}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
-      {/* Spacer per allineamento layout se necessario */}
+      {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Investimenti</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
       <div className="h-2"></div>
 
       {/* Sezione Fondi Pensione */}
@@ -776,6 +874,61 @@ export const Investments: React.FC = () => {
         confirmText="Elimina Definitivamente"
         isDangerous={true}
       />
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Guida Investimenti"
+        subtitle="Help"
+      >
+        <div className="space-y-8">
+           <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
+               <p className="text-sm text-emerald-800 leading-relaxed font-medium">
+                  Questa sezione ti permette di monitorare l'andamento dei tuoi asset finanziari (ETF, Azioni, Fondi, Cripto) tracciando manualmente il loro valore nel tempo.
+               </p>
+           </div>
+           
+           <div>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Come Funziona</h4>
+              <div className="space-y-4">
+                 <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+                    <div className="text-sm text-slate-600">
+                       <span className="font-bold text-slate-900 block mb-0.5">Crea l'Investimento</span>
+                       Definisci il nome (es. "VWCE ETF") e la valuta base. Puoi segnarlo come "Fondo Pensione" per separarlo dai tuoi investimenti liquidi.
+                    </div>
+                 </div>
+                 <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
+                    <div className="text-sm text-slate-600">
+                       <span className="font-bold text-slate-900 block mb-0.5">Aggiungi Rilevazioni (Update)</span>
+                       Periodicamente (es. ogni mese), clicca sulla card e aggiungi una nuova "Rilevazione". Inserisci il <span className="font-bold">Valore Totale Attuale</span> del portafoglio e il <span className="font-bold">Cash Flow</span> (quanto hai versato di tasca tua in quel periodo).
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           <div>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Formule Finanziarie</h4>
+              <div className="grid gap-4">
+                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Guadagno Netto</span>
+                    <div className="text-sm font-medium text-slate-800 mt-1">
+                       = (Valore Attuale) - (Totale Versato)
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Indica quanto hai guadagnato in valore assoluto.</p>
+                 </div>
+                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-500 uppercase">ROI Totale (Return on Investment)</span>
+                    <div className="text-sm font-medium text-slate-800 mt-1">
+                       = (Guadagno Netto / Totale Versato) * 100
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">La percentuale di rendimento complessiva dall'inizio dell'investimento.</p>
+                 </div>
+              </div>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };

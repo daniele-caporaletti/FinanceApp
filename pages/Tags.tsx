@@ -2,12 +2,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Transaction } from '../types';
+import { FullScreenModal } from '../components/FullScreenModal';
 
 export const Tags: React.FC = () => {
   const { transactions, categories, accounts } = useFinance();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [drillDownId, setDrillDownId] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   // Filtro Anno per i Tag
   const [filterYear, setFilterYear] = useState<number | 'all' | 'general'>('all');
@@ -149,6 +151,17 @@ export const Tags: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 min-h-screen flex flex-col pb-20">
       
+      {/* Page Header */}
+      <div className="flex items-center gap-3 mb-2 flex-shrink-0">
+           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Tag</h2>
+           <button 
+              onClick={() => setIsInfoOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+           >
+               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           </button>
+      </div>
+
       {/* Tag Year Filter & List */}
       <div className="flex flex-col md:flex-row flex-shrink-0 gap-4 items-start w-full">
         <div className="flex-1 w-full md:w-auto min-w-0 flex flex-col gap-2">
@@ -493,6 +506,42 @@ export const Tags: React.FC = () => {
           </div>
         </div>
       )}
+
+      <FullScreenModal 
+        isOpen={isInfoOpen} 
+        onClose={() => setIsInfoOpen(false)} 
+        title="Gestione Tag"
+        subtitle="Help"
+      >
+        <div className="space-y-6">
+           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  I Tag sono etichette trasversali che ti permettono di raggruppare spese di categorie diverse sotto un unico evento.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Esempi d'Uso</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Viaggi:</span> Usa un tag come <code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-bold text-slate-700">#Giappone2024</code> per raggruppare volo, hotel, cibo e souvenir.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Eventi:</span> Usa <code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-bold text-slate-700">#MatrimonioLuca</code> per tracciare regalo, abito e viaggio.</p>
+                 </li>
+              </ul>
+           </div>
+
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Filtro Anno</h4>
+              <p className="text-sm text-slate-500">
+                  Il sistema riconosce automaticamente l'anno se il tag finisce con 4 cifre (es. "Vacanza 2023"). Questo permette di filtrare i tag per anno nella barra in alto.
+              </p>
+           </div>
+        </div>
+      </FullScreenModal>
     </div>
   );
 };
