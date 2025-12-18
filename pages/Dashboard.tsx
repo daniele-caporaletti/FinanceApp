@@ -95,7 +95,6 @@ export const Dashboard: React.FC = () => {
   const monthName = new Date(selectedYear, currentMonthIndex).toLocaleString('it-IT', { month: 'long' });
 
   const goToTransactions = (monthIdx: number, type: 'income' | 'variable' | 'fixed' | 'work') => {
-    // Se monthIdx è -1 (Totale), passiamo un array vuoto per indicare "Tutti i mesi"
     const monthsFilter = monthIdx === -1 ? [] : [monthIdx + 1];
 
     const params: any = {
@@ -125,7 +124,6 @@ export const Dashboard: React.FC = () => {
     navigateTo(AppSection.Movimenti, params);
   };
 
-  // Navigazione KPI Cards
   const handleVariableExpensesClick = () => {
     navigateTo(AppSection.Movimenti, {
         year: selectedYear.toString(),
@@ -136,9 +134,9 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 w-full max-w-full overflow-x-hidden">
       
-      {/* Header Minimal - Responsive */}
+      {/* Header Minimal */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Financial Overview</h2>
@@ -157,8 +155,8 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Cards Minimal - Interactive */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      {/* Cards: Impilate verticalmente su mobile (grid-cols-1) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* KPI 1: Uscite Variabili */}
         <div 
             onClick={handleVariableExpensesClick}
@@ -196,11 +194,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Matrix Table - Interactive */}
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-         <div className="px-6 py-6 md:px-8 md:py-8 flex justify-between items-center bg-[#fcfdfe] border-b border-slate-50">
+      {/* VISTA DESKTOP: Matrice Completa (Nascosta su Mobile) */}
+      <div className="hidden md:block bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+         <div className="px-8 py-8 flex justify-between items-center bg-[#fcfdfe] border-b border-slate-50">
             <h3 className="text-lg font-bold text-slate-900">Matrice Cashflow {selectedYear}</h3>
-            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest hidden md:block">Valori in CHF</span>
+            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Valori in CHF</span>
          </div>
          
          <div className="overflow-x-auto custom-scrollbar">
@@ -208,7 +206,6 @@ export const Dashboard: React.FC = () => {
                <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50">
                      <th className="w-[120px] px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mese</th>
-                     {/* Header Centrati come richiesto */}
                      <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Entrate</th>
                      <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Variabili</th>
                      <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Fisse</th>
@@ -219,7 +216,6 @@ export const Dashboard: React.FC = () => {
                <tbody>
                   {matrixData.map((data, idx) => {
                      const rowTotal = data.income + data.variable + data.fixed + data.work;
-                     // Only highlight if current month of selected year
                      const isCurrent = new Date().getFullYear() === selectedYear && new Date().getMonth() === idx;
 
                      return (
@@ -227,37 +223,27 @@ export const Dashboard: React.FC = () => {
                            <td className="px-6 py-4">
                               <span className={`text-sm font-bold ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{monthNames[idx]}</span>
                            </td>
-                           
-                           {/* Entrate */}
-                           <td onClick={() => goToTransactions(idx, 'income')} className="px-4 py-4 text-right cursor-pointer hover:bg-emerald-50/30 transition-colors">
+                           <td onClick={() => goToTransactions(idx, 'income')} className="px-4 py-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-colors">
                               <span className={`text-sm font-mono tracking-tight font-medium ${data.income !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                                 {data.income !== 0 ? data.income.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : '-'}
                               </span>
                            </td>
-
-                           {/* Variabili */}
-                           <td onClick={() => goToTransactions(idx, 'variable')} className="px-4 py-4 text-right cursor-pointer hover:bg-rose-50/30 transition-colors">
+                           <td onClick={() => goToTransactions(idx, 'variable')} className="px-4 py-4 text-center cursor-pointer hover:bg-rose-50/30 transition-colors">
                               <span className={`text-sm font-mono tracking-tight font-medium ${data.variable !== 0 ? 'text-rose-500' : 'text-slate-300'}`}>
                                 {data.variable !== 0 ? data.variable.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : '-'}
                               </span>
                            </td>
-
-                           {/* Fisse */}
-                           <td onClick={() => goToTransactions(idx, 'fixed')} className="px-4 py-4 text-right cursor-pointer hover:bg-rose-50/30 transition-colors">
+                           <td onClick={() => goToTransactions(idx, 'fixed')} className="px-4 py-4 text-center cursor-pointer hover:bg-rose-50/30 transition-colors">
                               <span className={`text-sm font-mono tracking-tight font-medium ${data.fixed !== 0 ? 'text-rose-500' : 'text-slate-300'}`}>
                                 {data.fixed !== 0 ? data.fixed.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : '-'}
                               </span>
                            </td>
-
-                           {/* Lavoro */}
-                           <td onClick={() => goToTransactions(idx, 'work')} className="px-4 py-4 text-right cursor-pointer hover:bg-indigo-50/30 transition-colors">
+                           <td onClick={() => goToTransactions(idx, 'work')} className="px-4 py-4 text-center cursor-pointer hover:bg-indigo-50/30 transition-colors">
                               <span className={`text-sm font-mono tracking-tight font-medium ${data.work !== 0 ? (data.work > 0 ? 'text-indigo-600' : 'text-rose-500') : 'text-slate-300'}`}>
                                 {data.work !== 0 ? data.work.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : '-'}
                               </span>
                            </td>
-
-                           {/* Totale Riga */}
-                           <td className="px-4 py-4 text-right cursor-default">
+                           <td className="px-4 py-4 text-center cursor-default">
                                <span className={`text-sm font-mono tracking-tight font-bold ${rowTotal > 0 ? 'text-emerald-600' : rowTotal < 0 ? 'text-rose-600' : 'text-slate-300'}`}>
                                   {rowTotal !== 0 ? rowTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : '-'}
                                </span>
@@ -269,23 +255,65 @@ export const Dashboard: React.FC = () => {
                <tfoot className="bg-slate-50/50 border-t border-slate-100">
                   <tr>
                      <td className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Totale</td>
-                     <td className="px-4 py-5 text-right font-mono font-bold text-emerald-600 cursor-pointer hover:bg-emerald-100/30" onClick={() => goToTransactions(-1, 'income')}>
+                     <td className="px-4 py-5 text-center font-mono font-bold text-emerald-600 cursor-pointer hover:bg-emerald-100/30" onClick={() => goToTransactions(-1, 'income')}>
                         {matrixTotals.income.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                      </td>
-                     <td className="px-4 py-5 text-right font-mono font-bold text-rose-600 cursor-pointer hover:bg-rose-100/30" onClick={() => goToTransactions(-1, 'variable')}>
+                     <td className="px-4 py-5 text-center font-mono font-bold text-rose-600 cursor-pointer hover:bg-rose-100/30" onClick={() => goToTransactions(-1, 'variable')}>
                         {matrixTotals.variable.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                      </td>
-                     <td className="px-4 py-5 text-right font-mono font-bold text-rose-600 cursor-pointer hover:bg-rose-100/30" onClick={() => goToTransactions(-1, 'fixed')}>
+                     <td className="px-4 py-5 text-center font-mono font-bold text-rose-600 cursor-pointer hover:bg-rose-100/30" onClick={() => goToTransactions(-1, 'fixed')}>
                         {matrixTotals.fixed.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                      </td>
-                     <td className="px-4 py-5 text-right font-mono font-bold text-indigo-600 cursor-pointer hover:bg-indigo-100/30" onClick={() => goToTransactions(-1, 'work')}>
+                     <td className="px-4 py-5 text-center font-mono font-bold text-indigo-600 cursor-pointer hover:bg-indigo-100/30" onClick={() => goToTransactions(-1, 'work')}>
                         {matrixTotals.work.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                      </td>
-                     <td className={`px-4 py-5 text-right font-mono font-black ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                     <td className={`px-4 py-5 text-center font-mono font-black ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
                   </tr>
                </tfoot>
             </table>
          </div>
+      </div>
+
+      {/* VISTA MOBILE: Lista Compatta Mensile */}
+      <div className="md:hidden space-y-3">
+        {matrixData.map((data, idx) => {
+            const rowTotal = data.income + data.variable + data.fixed + data.work;
+            const isCurrent = new Date().getFullYear() === selectedYear && new Date().getMonth() === idx;
+            // Mostriamo solo i mesi che hanno dati o il mese corrente
+            if (rowTotal === 0 && data.income === 0 && data.variable === 0 && data.fixed === 0 && !isCurrent) return null;
+
+            return (
+                <div key={idx} className={`bg-white rounded-[1.2rem] p-4 border shadow-sm ${isCurrent ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-100'}`}>
+                    {/* Intestazione Riga: Mese e Totale Netto */}
+                    <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-50">
+                        <span className={`text-base font-bold capitalize ${isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{monthNames[idx]}</span>
+                        <div className={`text-sm font-black ${rowTotal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {rowTotal > 0 ? '+' : ''}{rowTotal.toLocaleString('it-IT', { minimumFractionDigits: 0 })} <span className="text-[10px] text-slate-300">CHF</span>
+                        </div>
+                    </div>
+                    
+                    {/* Griglia Dettagli 2x2 */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div onClick={() => goToTransactions(idx, 'income')} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl cursor-pointer active:bg-slate-100">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase">Entrate</span>
+                             <span className={`text-xs font-bold ${data.income !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{data.income !== 0 ? `+${data.income.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '-'}</span>
+                        </div>
+                        <div onClick={() => goToTransactions(idx, 'variable')} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl cursor-pointer active:bg-slate-100">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase">Variabili</span>
+                             <span className={`text-xs font-bold ${data.variable !== 0 ? 'text-rose-500' : 'text-slate-300'}`}>{data.variable !== 0 ? data.variable.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}</span>
+                        </div>
+                        <div onClick={() => goToTransactions(idx, 'fixed')} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl cursor-pointer active:bg-slate-100">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase">Fisse</span>
+                             <span className={`text-xs font-bold ${data.fixed !== 0 ? 'text-rose-500' : 'text-slate-300'}`}>{data.fixed !== 0 ? data.fixed.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}</span>
+                        </div>
+                         <div onClick={() => goToTransactions(idx, 'work')} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl cursor-pointer active:bg-slate-100">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase">Lavoro</span>
+                             <span className={`text-xs font-bold ${data.work !== 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{data.work !== 0 ? data.work.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        })}
       </div>
     </div>
   );
