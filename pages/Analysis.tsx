@@ -198,25 +198,28 @@ export const Analysis: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20 w-full overflow-hidden">
       
       {/* Controls Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm">
-         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar max-w-full p-2 w-full md:w-auto">
+      <div className="flex flex-col lg:flex-row justify-between items-center bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm gap-2 max-w-full">
+         {/* Year Selector - Shrinkable */}
+         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar max-w-full p-2 w-full lg:w-auto flex-shrink min-w-0">
             {availableYears.map(y => (
                 <button 
                   key={y} 
                   onClick={() => setSelectedYear(y)}
-                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
                 >
                     {y}
                 </button>
             ))}
          </div>
-         <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar max-w-full p-2 border-t md:border-t-0 md:border-l border-slate-100 w-full md:w-auto">
+
+         {/* Month Selector - Shrinkable */}
+         <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar max-w-full p-2 border-t lg:border-t-0 lg:border-l border-slate-100 w-full lg:w-auto min-w-0">
             <button 
                 onClick={() => setSelectedMonth('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
             >
                 Tutto l'anno
             </button>
@@ -224,7 +227,7 @@ export const Analysis: React.FC = () => {
                  <button 
                    key={m} 
                    onClick={() => setSelectedMonth(idx)}
-                   className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                   className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all flex-shrink-0 ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
                  >
                     {m}
                  </button>
@@ -239,14 +242,14 @@ export const Analysis: React.FC = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entrate Nette</span>
                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg></div>
             </div>
-            <div className="text-2xl font-black text-slate-900 mt-2">CHF {kpi.income.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-black text-slate-900 mt-2 truncate">CHF {kpi.income.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
          </div>
          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
             <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Uscite Nette</span>
                 <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg></div>
             </div>
-            <div className="text-2xl font-black text-rose-600 mt-2">CHF {kpi.expense.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-black text-rose-600 mt-2 truncate">CHF {kpi.expense.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
          </div>
          <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
              <div className="flex justify-between items-start relative z-10">
@@ -255,7 +258,7 @@ export const Analysis: React.FC = () => {
                     {kpi.savingsRate.toFixed(1)}% Rate
                 </span>
             </div>
-            <div className={`text-2xl font-black mt-2 relative z-10 ${kpi.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <div className={`text-2xl font-black mt-2 relative z-10 truncate ${kpi.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {kpi.savings > 0 ? '+' : ''}CHF {kpi.savings.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
             </div>
             
@@ -268,7 +271,7 @@ export const Analysis: React.FC = () => {
 
       {/* Main Trend Chart (Only visible if 'all' months selected) */}
       {selectedMonth === 'all' && (
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col overflow-hidden max-w-full">
               <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-900">Andamento Annuale</h3>
                   <div className="flex items-center space-x-4">
@@ -276,9 +279,9 @@ export const Analysis: React.FC = () => {
                       <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Uscite</span></div>
                   </div>
               </div>
-              <div className="flex-1 w-full">
+              <div className="flex-1 w-full min-w-0 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={trendData} barGap={4} barSize={12}>
+                      <BarChart data={trendData} barGap={4} barSize={12} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} dy={10} />
                           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(value) => `${value / 1000}k`} />
@@ -295,11 +298,11 @@ export const Analysis: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Category Pie Chart */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] overflow-hidden">
               <h3 className="text-lg font-bold text-slate-900 mb-2">Ripartizione Spese</h3>
               <p className="text-xs text-slate-400 mb-6">Dove sono finiti i tuoi soldi nel periodo selezionato.</p>
               
-              <div className="flex-1 relative">
+              <div className="flex-1 relative min-w-0 min-h-0">
                  {categoryData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -331,9 +334,9 @@ export const Analysis: React.FC = () => {
           </div>
 
           {/* Top Spending Details */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] overflow-hidden">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Dettaglio Top Categorie</h3>
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8 min-w-0">
                   {topCategoriesList.length > 0 ? topCategoriesList.map((cat, idx) => {
                       const isExpanded = expandedDetails.has(cat.name);
                       const visibleSubs = isExpanded ? cat.subs : cat.subs.slice(0, 3);
@@ -342,11 +345,11 @@ export const Analysis: React.FC = () => {
                           <div key={idx} className="group">
                               {/* Header Categoria */}
                               <div className="flex justify-between items-center mb-2">
-                                  <div className="flex items-center space-x-3">
-                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div>
-                                      <span className="font-bold text-sm text-slate-700">{cat.name}</span>
+                                  <div className="flex items-center space-x-3 truncate">
+                                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
+                                      <span className="font-bold text-sm text-slate-700 truncate">{cat.name}</span>
                                   </div>
-                                  <span className="font-black text-sm text-slate-900">CHF {cat.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                                  <span className="font-black text-sm text-slate-900 whitespace-nowrap ml-2">CHF {cat.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
                               </div>
                               
                               {/* Progress bar visual */}
@@ -358,8 +361,8 @@ export const Analysis: React.FC = () => {
                               <div className="pl-6 space-y-1.5 animate-in fade-in duration-300">
                                   {visibleSubs.map((sub, sIdx) => (
                                       <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                                          <span>{sub.name}</span>
-                                          <span className="font-medium">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                          <span className="truncate mr-2">{sub.name}</span>
+                                          <span className="font-medium whitespace-nowrap">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                                       </div>
                                   ))}
                                   
