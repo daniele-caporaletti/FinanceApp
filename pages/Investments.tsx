@@ -713,11 +713,19 @@ export const Investments: React.FC = () => {
         initialData={modalState.initialData}
       />
       
-      <DeleteConfirmModal 
+      <ConfirmModal 
         isOpen={deleteDialog.open} 
         onClose={() => setDeleteDialog({ open: false })} 
         onConfirm={handleConfirmDelete}
-        itemName={deleteDialog.item?.name || ''}
+        title="Elimina Elemento"
+        message={
+            <>
+                Stai per eliminare <span className="font-bold text-slate-800">"{deleteDialog.item?.name}"</span>.<br/>
+                Questa azione è irreversibile.
+            </>
+        }
+        confirmText="Elimina Definitivamente"
+        isDangerous={true}
       />
     </div>
   );
