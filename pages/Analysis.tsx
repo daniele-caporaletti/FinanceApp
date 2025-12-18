@@ -200,38 +200,44 @@ export const Analysis: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20 w-full overflow-hidden">
       
-      {/* Controls Bar */}
-      <div className="flex flex-col lg:flex-row justify-between items-center bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm gap-2 max-w-full">
-         {/* Year Selector - Shrinkable */}
-         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar max-w-full p-2 w-full lg:w-auto flex-shrink min-w-0">
-            {availableYears.map(y => (
-                <button 
-                  key={y} 
-                  onClick={() => setSelectedYear(y)}
-                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
-                >
-                    {y}
-                </button>
-            ))}
-         </div>
+      {/* Controls Bar - Robusta struttura per overflow */}
+      <div className="bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm w-full">
+         <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
+            {/* Year Selector Wrapper */}
+            <div className="w-full lg:w-auto overflow-x-auto no-scrollbar">
+                <div className="flex items-center space-x-2 p-1 min-w-max">
+                    {availableYears.map(y => (
+                        <button 
+                          key={y} 
+                          onClick={() => setSelectedYear(y)}
+                          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                        >
+                            {y}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-         {/* Month Selector - Shrinkable */}
-         <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar max-w-full p-2 border-t lg:border-t-0 lg:border-l border-slate-100 w-full lg:w-auto min-w-0">
-            <button 
-                onClick={() => setSelectedMonth('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
-            >
-                Tutto l'anno
-            </button>
-            {monthNames.map((m, idx) => (
-                 <button 
-                   key={m} 
-                   onClick={() => setSelectedMonth(idx)}
-                   className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all flex-shrink-0 ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
-                 >
-                    {m}
-                 </button>
-            ))}
+            {/* Month Selector Wrapper */}
+            <div className="w-full lg:w-auto lg:border-l border-t lg:border-t-0 border-slate-100 overflow-x-auto no-scrollbar">
+                <div className="flex items-center space-x-1 p-1 min-w-max">
+                    <button 
+                        onClick={() => setSelectedMonth('all')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                    >
+                        Tutto l'anno
+                    </button>
+                    {monthNames.map((m, idx) => (
+                         <button 
+                           key={m} 
+                           onClick={() => setSelectedMonth(idx)}
+                           className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                         >
+                            {m}
+                         </button>
+                    ))}
+                </div>
+            </div>
          </div>
       </div>
 
@@ -271,7 +277,7 @@ export const Analysis: React.FC = () => {
 
       {/* Main Trend Chart (Only visible if 'all' months selected) */}
       {selectedMonth === 'all' && (
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col overflow-hidden max-w-full">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col relative w-full overflow-hidden">
               <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-900">Andamento Annuale</h3>
                   <div className="flex items-center space-x-4">
@@ -279,7 +285,7 @@ export const Analysis: React.FC = () => {
                       <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Uscite</span></div>
                   </div>
               </div>
-              <div className="flex-1 w-full min-w-0 min-h-0">
+              <div className="flex-1 w-full min-w-0 overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={trendData} barGap={4} barSize={12} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -298,11 +304,11 @@ export const Analysis: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Category Pie Chart */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] overflow-hidden">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] w-full overflow-hidden">
               <h3 className="text-lg font-bold text-slate-900 mb-2">Ripartizione Spese</h3>
               <p className="text-xs text-slate-400 mb-6">Dove sono finiti i tuoi soldi nel periodo selezionato.</p>
               
-              <div className="flex-1 relative min-w-0 min-h-0">
+              <div className="flex-1 relative min-w-0 min-h-0 w-full">
                  {categoryData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -334,15 +340,15 @@ export const Analysis: React.FC = () => {
           </div>
 
           {/* Top Spending Details */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] overflow-hidden">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] w-full overflow-hidden">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Dettaglio Top Categorie</h3>
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8 min-w-0">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8 w-full">
                   {topCategoriesList.length > 0 ? topCategoriesList.map((cat, idx) => {
                       const isExpanded = expandedDetails.has(cat.name);
                       const visibleSubs = isExpanded ? cat.subs : cat.subs.slice(0, 3);
                       
                       return (
-                          <div key={idx} className="group">
+                          <div key={idx} className="group w-full min-w-0">
                               {/* Header Categoria */}
                               <div className="flex justify-between items-center mb-2">
                                   <div className="flex items-center space-x-3 truncate">
@@ -360,7 +366,7 @@ export const Analysis: React.FC = () => {
                               {/* Subcategories (Expandable) */}
                               <div className="pl-6 space-y-1.5 animate-in fade-in duration-300">
                                   {visibleSubs.map((sub, sIdx) => (
-                                      <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                                      <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400 hover:text-slate-600 transition-colors w-full">
                                           <span className="truncate mr-2">{sub.name}</span>
                                           <span className="font-medium whitespace-nowrap">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                                       </div>

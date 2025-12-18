@@ -171,7 +171,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, isSyncing }) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-64 p-4 lg:p-12 pt-20 lg:pt-12">
+      <main className="flex-1 lg:ml-64 p-4 lg:p-12 pt-20 lg:pt-12 w-full min-w-0 overflow-x-hidden">
         <div className="max-w-7xl mx-auto space-y-8">
            {children}
         </div>
