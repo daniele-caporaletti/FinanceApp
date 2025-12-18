@@ -14,9 +14,21 @@ export const Analysis: React.FC = () => {
   
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all');
+  
+  // Stato per gestire l'espansione delle sottocategorie nel dettaglio
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
 
   const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
   const fullMonthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+
+  const toggleDetail = (categoryName: string) => {
+    setExpandedDetails(prev => {
+        const next = new Set(prev);
+        if (next.has(categoryName)) next.delete(categoryName);
+        else next.add(categoryName);
+        return next;
+    });
+  };
 
   // 1. Data Filtering (Core Logic: No Work, No Transfer)
   const filteredTransactions = useMemo(() => {
@@ -186,25 +198,25 @@ export const Analysis: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
       {/* Controls Bar */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm">
-         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar max-w-full p-2">
+         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar max-w-full p-2 w-full md:w-auto">
             {availableYears.map(y => (
                 <button 
                   key={y} 
                   onClick={() => setSelectedYear(y)}
-                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
                 >
                     {y}
                 </button>
             ))}
          </div>
-         <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar max-w-full p-2 border-t md:border-t-0 md:border-l border-slate-100">
+         <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar max-w-full p-2 border-t md:border-t-0 md:border-l border-slate-100 w-full md:w-auto">
             <button 
                 onClick={() => setSelectedMonth('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
             >
                 Tutto l'anno
             </button>
@@ -212,7 +224,7 @@ export const Analysis: React.FC = () => {
                  <button 
                    key={m} 
                    onClick={() => setSelectedMonth(idx)}
-                   className={`w-8 h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                   className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
                  >
                     {m}
                  </button>
@@ -221,22 +233,22 @@ export const Analysis: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
             <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entrate Nette</span>
                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg></div>
             </div>
             <div className="text-2xl font-black text-slate-900 mt-2">CHF {kpi.income.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
          </div>
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
+         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
             <div className="flex justify-between items-start">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Uscite Nette</span>
                 <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg></div>
             </div>
             <div className="text-2xl font-black text-rose-600 mt-2">CHF {kpi.expense.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
          </div>
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
+         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
              <div className="flex justify-between items-start relative z-10">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risparmio</span>
                 <span className={`text-xs font-black px-2 py-1 rounded-lg ${kpi.savingsRate >= 20 ? 'bg-emerald-100 text-emerald-700' : kpi.savingsRate > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
@@ -256,12 +268,12 @@ export const Analysis: React.FC = () => {
 
       {/* Main Trend Chart (Only visible if 'all' months selected) */}
       {selectedMonth === 'all' && (
-          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[400px] flex flex-col">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col">
               <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-900">Andamento Annuale</h3>
                   <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-emerald-500 rounded-full"></span><span className="text-xs font-bold text-slate-500">Entrate</span></div>
-                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-xs font-bold text-slate-500">Uscite</span></div>
+                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-emerald-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Entrate</span></div>
+                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Uscite</span></div>
                   </div>
               </div>
               <div className="flex-1 w-full">
@@ -283,7 +295,7 @@ export const Analysis: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Category Pie Chart */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
               <h3 className="text-lg font-bold text-slate-900 mb-2">Ripartizione Spese</h3>
               <p className="text-xs text-slate-400 mb-6">Dove sono finiti i tuoi soldi nel periodo selezionato.</p>
               
@@ -319,38 +331,58 @@ export const Analysis: React.FC = () => {
           </div>
 
           {/* Top Spending Details */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
+          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Dettaglio Top Categorie</h3>
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
-                  {topCategoriesList.length > 0 ? topCategoriesList.map((cat, idx) => (
-                      <div key={idx} className="group">
-                          <div className="flex justify-between items-center mb-2">
-                              <div className="flex items-center space-x-3">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div>
-                                  <span className="font-bold text-sm text-slate-700">{cat.name}</span>
-                              </div>
-                              <span className="font-black text-sm text-slate-900">CHF {cat.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          
-                          {/* Progress bar visual */}
-                          <div className="w-full h-1.5 bg-slate-50 rounded-full mb-3 overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${(cat.total / kpi.expense) * 100}%`, backgroundColor: cat.color }}></div>
-                          </div>
-
-                          {/* Subcategories (Top 3) */}
-                          <div className="pl-6 space-y-1">
-                              {cat.subs.slice(0, 3).map((sub, sIdx) => (
-                                  <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400">
-                                      <span>{sub.name}</span>
-                                      <span className="font-medium">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8">
+                  {topCategoriesList.length > 0 ? topCategoriesList.map((cat, idx) => {
+                      const isExpanded = expandedDetails.has(cat.name);
+                      const visibleSubs = isExpanded ? cat.subs : cat.subs.slice(0, 3);
+                      
+                      return (
+                          <div key={idx} className="group">
+                              {/* Header Categoria */}
+                              <div className="flex justify-between items-center mb-2">
+                                  <div className="flex items-center space-x-3">
+                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div>
+                                      <span className="font-bold text-sm text-slate-700">{cat.name}</span>
                                   </div>
-                              ))}
-                              {cat.subs.length > 3 && (
-                                  <div className="text-[10px] text-slate-300 italic pl-1">e altre {cat.subs.length - 3}...</div>
-                              )}
+                                  <span className="font-black text-sm text-slate-900">CHF {cat.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              
+                              {/* Progress bar visual */}
+                              <div className="w-full h-1.5 bg-slate-50 rounded-full mb-3 overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${(cat.total / kpi.expense) * 100}%`, backgroundColor: cat.color }}></div>
+                              </div>
+
+                              {/* Subcategories (Expandable) */}
+                              <div className="pl-6 space-y-1.5 animate-in fade-in duration-300">
+                                  {visibleSubs.map((sub, sIdx) => (
+                                      <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                                          <span>{sub.name}</span>
+                                          <span className="font-medium">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                      </div>
+                                  ))}
+                                  
+                                  {/* Toggle Button */}
+                                  {cat.subs.length > 3 && (
+                                      <button 
+                                        onClick={() => toggleDetail(cat.name)}
+                                        className="flex items-center space-x-1 text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors mt-1 pt-1 cursor-pointer focus:outline-none"
+                                      >
+                                          <svg 
+                                            xmlns="http://www.w3.org/2000/svg" 
+                                            className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                          >
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                                          </svg>
+                                          <span>{isExpanded ? 'Mostra meno' : `Vedi altre ${cat.subs.length - 3}`}</span>
+                                      </button>
+                                  )}
+                              </div>
                           </div>
-                      </div>
-                  )) : (
+                      );
+                  }) : (
                       <div className="text-center py-20 text-slate-300 font-bold text-sm">Nessun dato disponibile</div>
                   )}
               </div>

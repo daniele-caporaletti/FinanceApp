@@ -18,8 +18,9 @@ export const supabaseFetch = async <T,>(table: string): Promise<T[]> => {
       .range(from, from + step - 1);
 
     if (error) {
+      const errorMsg = error.message || JSON.stringify(error);
       console.error(`Error fetching ${table}:`, error);
-      throw new Error(`Error fetching ${table}: ${error.message}`);
+      throw new Error(`Error fetching ${table}: ${errorMsg}`);
     }
 
     if (data && data.length > 0) {
