@@ -1,0 +1,5 @@
+{
+  "name": "FinanceWeb",
+  "description": "A comprehensive personal finance management application that synchronizes data from Supabase and provides insights using Gemini AI.",
+  "requestFramePermissions": []
+}
