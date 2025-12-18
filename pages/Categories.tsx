@@ -383,7 +383,7 @@ export const Categories: React.FC = () => {
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Sottocategorie:</span> Dettagliano la spesa (es. Casa -> Affitto, Casa -> Bollette). Puoi creare sottocategorie cliccando il tasto "+" accanto a una categoria principale.</p>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Sottocategorie:</span> Dettagliano la spesa (es. Casa &rarr; Affitto, Casa &rarr; Bollette). Puoi creare sottocategorie cliccando il tasto "+" accanto a una categoria principale.</p>
                  </li>
               </ul>
            </div>
