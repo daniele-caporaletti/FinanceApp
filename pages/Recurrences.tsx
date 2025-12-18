@@ -263,7 +263,7 @@ export const Recurrences: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
       {/* Header e Selettore Anno */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-6">
@@ -302,8 +302,8 @@ export const Recurrences: React.FC = () => {
          </div>
       </div>
 
-      {/* Matrix Table */}
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+      {/* VISTA DESKTOP: TABELLA MATRICE */}
+      <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-8 py-6 bg-[#fcfdfe] border-b border-slate-100">
              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Panoramica Mensile {selectedYear}</h3>
         </div>
@@ -336,7 +336,6 @@ export const Recurrences: React.FC = () => {
                                     </div>
                                 </td>
                                 {monthNames.map((_, idx) => {
-                                    // Se annuale e non è il mese giusto, mostra cella vuota
                                     if (isYearly && idx !== recMonth) {
                                         return <td key={idx} className="bg-slate-50/40 border-l border-r border-transparent"></td>;
                                     }
@@ -378,21 +377,90 @@ export const Recurrences: React.FC = () => {
                             </tr>
                         );
                     })}
-                    {sortedRecurrences.length === 0 && (
-                        <tr>
-                            <td colSpan={14} className="py-20 text-center">
-                                <div className="flex flex-col items-center justify-center">
-                                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    </div>
-                                    <p className="text-slate-400 font-medium text-sm">Nessuna ricorrenza configurata.</p>
-                                </div>
-                            </td>
-                        </tr>
-                    )}
                 </tbody>
             </table>
         </div>
+      </div>
+
+      {/* VISTA MOBILE: CARDS */}
+      <div className="md:hidden space-y-4">
+         {sortedRecurrences.map(rec => {
+            const recDay = new Date(rec.occurred_on).getDate();
+            const isYearly = rec.frequency === 'yearly';
+            const recMonth = new Date(rec.occurred_on).getMonth();
+
+            return (
+              <div key={rec.id} className={`bg-white p-5 rounded-[1.5rem] shadow-sm border border-slate-100 ${!rec.is_active ? 'opacity-70' : ''}`}>
+                 <div className="flex justify-between items-start mb-3">
+                    <div>
+                        <div className="flex items-center space-x-2">
+                             <span className="font-bold text-slate-900">{rec.name}</span>
+                             {isYearly && <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[9px] font-bold uppercase border border-purple-100">1/Y</span>}
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Giorno {recDay} del mese</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                       <span className="font-black text-slate-900 text-lg">
+                           {Math.abs(rec.amount_original).toLocaleString('it-IT')} <span className="text-xs text-slate-400">CHF</span>
+                       </span>
+                    </div>
+                 </div>
+
+                 {/* Mini Timeline 12 mesi */}
+                 <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl mb-4 overflow-x-auto no-scrollbar">
+                    {monthNames.map((m, idx) => {
+                         // Se annuale e non è il mese giusto, mostra placeholder
+                         if (isYearly && idx !== recMonth) {
+                             return <div key={idx} className="w-2 h-2 rounded-full bg-slate-200 opacity-20 mx-1"></div>;
+                         }
+
+                         const isDone = checkStatus(rec, idx, selectedYear);
+                         const now = new Date();
+                         const isPast = (selectedYear < now.getFullYear()) || (selectedYear === now.getFullYear() && idx < now.getMonth());
+                         const isCurrent = selectedYear === now.getFullYear() && idx === now.getMonth();
+                         const cellDate = new Date(selectedYear, idx, recDay + 1).toISOString().split('T')[0];
+                         
+                         return (
+                            <button
+                               key={idx}
+                               onClick={() => !isDone && rec.is_active && setGenModal({ open: true, recurrence: rec, defaultDate: cellDate })}
+                               disabled={isDone || !rec.is_active}
+                               className={`flex flex-col items-center min-w-[24px] gap-1 group`}
+                            >
+                                <div className={`w-3 h-3 rounded-full flex items-center justify-center transition-all ${
+                                    isDone ? 'bg-emerald-500' :
+                                    isCurrent ? 'bg-amber-400 ring-4 ring-amber-100 animate-pulse' :
+                                    isPast ? 'bg-rose-300' : 'bg-slate-200'
+                                }`}></div>
+                                <span className={`text-[8px] font-bold uppercase ${isCurrent ? 'text-slate-900' : 'text-slate-300'}`}>{m.charAt(0)}</span>
+                            </button>
+                         );
+                    })}
+                 </div>
+
+                 <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                    <button 
+                        onClick={() => setModalState({ open: true, initialData: rec })}
+                        className="text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-wide"
+                    >
+                        Modifica
+                    </button>
+                    <button 
+                        onClick={() => setDeleteDialog({ open: true, rec })}
+                        className="text-xs font-bold text-rose-300 hover:text-rose-600 transition-colors uppercase tracking-wide"
+                    >
+                        Elimina
+                    </button>
+                 </div>
+              </div>
+            );
+         })}
+         
+         {sortedRecurrences.length === 0 && (
+            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-[1.5rem]">
+               <p className="text-slate-400 text-sm font-bold">Nessuna ricorrenza</p>
+            </div>
+         )}
       </div>
 
       <RecurrenceModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateRecurring(r.id, r); else await addRecurring(r); }} initialData={modalState.initialData} accounts={accounts} categories={categories} />

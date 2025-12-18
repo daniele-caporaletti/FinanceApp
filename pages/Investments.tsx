@@ -392,8 +392,8 @@ export const Investments: React.FC = () => {
     };
     
     return (
-      <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 md:space-y-8 animate-in slide-in-from-right-4 duration-500 pb-20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => setSelectedInvestmentId(null)}
@@ -401,15 +401,15 @@ export const Investments: React.FC = () => {
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </button>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900">{selectedInvestment.name}</h2>
+            <div className="min-w-0">
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 truncate">{selectedInvestment.name}</h2>
               <div className="flex items-center space-x-2 mt-1">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedInvestment.currency}</span>
                 {selectedInvestment.is_for_retirement && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase rounded">Previdenza</span>}
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-3 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center space-x-3 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm self-start md:self-auto">
              <button 
                 onClick={() => setTrendModal({ open: true })}
                 className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-blue-100 transition-all flex items-center space-x-2"
@@ -423,43 +423,45 @@ export const Investments: React.FC = () => {
                 className="px-4 py-2 text-slate-400 hover:text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wide transition-all flex items-center space-x-2"
              >
                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-               <span>Config</span>
+               <span className="hidden md:inline">Config</span>
              </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Attuale</span>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              {(latest.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-slate-400">{selectedInvestment.currency}</span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Attuale</span>
+            <div className="text-xl md:text-2xl font-black text-slate-900 mt-1 truncate">
+              {(latest.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-slate-400 hidden md:inline">{selectedInvestment.currency}</span>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Versato</span>
-            <div className="text-2xl font-black text-slate-700 mt-1">
-              {(latest.totalInvested ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-slate-400">{selectedInvestment.currency}</span>
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Versato</span>
+            <div className="text-xl md:text-2xl font-black text-slate-700 mt-1 truncate">
+              {(latest.totalInvested ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guadagno Netto</span>
-            <div className={`text-2xl font-black mt-1 ${latest.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guadagno Netto</span>
+            <div className={`text-xl md:text-2xl font-black mt-1 truncate ${latest.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {latest.netGain > 0 ? '+' : ''}{(latest.netGain ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI Totale</span>
-            <div className={`text-2xl font-black mt-1 ${latest.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI Totale</span>
+            <div className={`text-xl md:text-2xl font-black mt-1 truncate ${latest.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {latest.totalRoi > 0 ? '+' : ''}{(latest.totalRoi ?? 0).toFixed(2)}%
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-8 py-5 bg-[#fcfdfe] border-b border-slate-100">
+          <div className="px-6 md:px-8 py-5 bg-[#fcfdfe] border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Storico Performance</h3>
           </div>
-          <div className="overflow-x-auto custom-scrollbar">
+          
+          {/* VISTA DESKTOP: TABELLA */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -514,6 +516,53 @@ export const Investments: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* VISTA MOBILE: LISTA VERTICALE */}
+          <div className="md:hidden">
+             {processedTrends.map((trend) => (
+                <div key={trend.id} className="p-5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                   <div className="flex justify-between items-start mb-2">
+                       <span className="text-sm font-bold text-slate-700 capitalize">
+                           {new Date(trend.value_on).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                       </span>
+                       <span className="text-base font-black text-slate-900">
+                           {(trend.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                       </span>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 gap-2 text-xs">
+                       <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-400 font-bold uppercase">Cashflow Mese</span>
+                           <span className={`font-mono font-medium ${trend.cash_flow > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                               {trend.cash_flow > 0 ? '+' : ''}{(trend.cash_flow ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                           </span>
+                       </div>
+                       <div className="flex flex-col text-right">
+                           <span className="text-[10px] text-slate-400 font-bold uppercase">ROI Totale</span>
+                           <span className={`font-black ${trend.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                               {trend.totalRoi > 0 ? '+' : ''}{(trend.totalRoi ?? 0).toFixed(2)}%
+                           </span>
+                       </div>
+                   </div>
+
+                   <div className="flex items-center justify-end space-x-4 mt-3 pt-3 border-t border-slate-50/50">
+                       <button 
+                          onClick={() => setTrendModal({ open: true, initialData: trend })}
+                          className="text-xs font-bold text-blue-600 uppercase tracking-wide px-2 py-1 bg-blue-50 rounded"
+                        >
+                          Modifica
+                        </button>
+                       <button 
+                          onClick={() => setDeleteDialog({ open: true, item: selectedInvestment, isTrend: true, trendId: trend.id })}
+                          className="text-xs font-bold text-rose-400 uppercase tracking-wide"
+                        >
+                          Elimina
+                        </button>
+                   </div>
+                </div>
+             ))}
+          </div>
+
         </div>
         
         <InvestmentModal 
@@ -606,7 +655,7 @@ export const Investments: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
       {/* Spacer per allineamento layout se necessario */}
       <div className="h-2"></div>
