@@ -164,9 +164,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, isSyncing }) => {
       
       {/* --- DESKTOP SIDEBAR --- */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-72 bg-white/80 backdrop-blur-xl border-r border-slate-200 p-6 z-40 flex-col">
-        <div className="mb-10 px-2">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter">finance<span className="text-blue-600">.</span></h1>
-            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">Personal Wealth OS</p>
+        <div className="mb-10 px-2 flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200">F</div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tighter">finance<span className="text-blue-600">.</span></h1>
+              <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase -mt-0.5">Personal OS</p>
+            </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
