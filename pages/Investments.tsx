@@ -4,6 +4,7 @@ import { useFinance } from '../FinanceContext';
 import { Investment, InvestmentTrend } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { FullScreenModal } from '../components/FullScreenModal';
+import { CustomSelect } from '../components/CustomSelect';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
 } from 'recharts';
@@ -54,6 +55,12 @@ const InvestmentModal: React.FC<InvestmentModalProps> = ({ isOpen, onClose, onSa
     }
   };
 
+  const currencyOptions = [
+      { value: 'CHF', label: 'CHF' },
+      { value: 'EUR', label: 'EUR' },
+      { value: 'USD', label: 'USD' }
+  ];
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
@@ -84,15 +91,7 @@ const InvestmentModal: React.FC<InvestmentModalProps> = ({ isOpen, onClose, onSa
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Valuta</label>
-              <select 
-                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 appearance-none"
-                value={formData.currency || 'CHF'}
-                onChange={e => setFormData(f => ({ ...f, currency: e.target.value }))}
-              >
-                <option value="CHF">CHF</option>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-              </select>
+              <CustomSelect value={formData.currency} onChange={(val) => setFormData(f => ({ ...f, currency: val }))} options={currencyOptions} />
             </div>
             
             <div className="flex items-center">
@@ -150,8 +149,8 @@ const TrendModal: React.FC<TrendModalProps> = ({ isOpen, onClose, onSave, initia
       setFormData(initialData || {
         investment_id: investmentId,
         value_on: new Date().toISOString().split('T')[0],
-        value_original: 0,
-        cash_flow: 0
+        value_original: undefined,
+        cash_flow: undefined
       });
     }
   }, [isOpen, initialData, investmentId]);
@@ -162,7 +161,7 @@ const TrendModal: React.FC<TrendModalProps> = ({ isOpen, onClose, onSave, initia
     e.preventDefault();
     setLoading(true);
     try {
-      await onSave({ ...formData, investment_id: investmentId });
+      await onSave({ ...formData, investment_id: investmentId, value_original: formData.value_original || 0, cash_flow: formData.cash_flow || 0 });
       onClose();
     } catch (err) {
       alert("Errore salvataggio rilevazione.");
@@ -204,10 +203,10 @@ const TrendModal: React.FC<TrendModalProps> = ({ isOpen, onClose, onSave, initia
               type="number"
               step="0.01"
               required
-              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="0.00"
-              value={formData.value_original || ''}
-              onChange={e => setFormData(f => ({ ...f, value_original: parseFloat(e.target.value) }))}
+              value={formData.value_original ?? ''}
+              onChange={e => setFormData(f => ({ ...f, value_original: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
             />
             <p className="text-[10px] text-slate-400 px-1">Inserisci il valore totale di mercato dell'investimento a questa data.</p>
           </div>
@@ -218,10 +217,10 @@ const TrendModal: React.FC<TrendModalProps> = ({ isOpen, onClose, onSave, initia
               type="number"
               step="0.01"
               required
-              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700"
+              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="0.00"
-              value={formData.cash_flow || 0}
-              onChange={e => setFormData(f => ({ ...f, cash_flow: parseFloat(e.target.value) }))}
+              value={formData.cash_flow ?? ''}
+              onChange={e => setFormData(f => ({ ...f, cash_flow: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
             />
              <p className="text-[10px] text-slate-400 px-1">Inserisci quanto hai versato (+) o prelevato (-) in questo specifico mese/periodo.</p>
           </div>
@@ -258,6 +257,89 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+// --- HELPER FUNCTION: Get stats for an investment ---
+const getInvestmentStats = (trends: InvestmentTrend[], invId: string) => {
+    const relatedTrends = trends.filter(t => t.investment_id === invId);
+    if (relatedTrends.length === 0) return null;
+
+    const sortedTrends = relatedTrends.sort((a,b) => new Date(a.value_on).getTime() - new Date(b.value_on).getTime());
+    const latest = sortedTrends[sortedTrends.length - 1];
+    const totalInvested = sortedTrends.reduce((sum, t) => sum + (t.cash_flow || 0), 0);
+    const netGain = (latest.value_original || 0) - totalInvested;
+    const roi = totalInvested !== 0 ? (netGain / totalInvested) * 100 : 0;
+
+    return {
+      latestValue: latest.value_original,
+      lastDate: latest.value_on,
+      totalInvested,
+      netGain,
+      roi
+    };
+};
+
+// --- COMPONENT: CARD INVESTIMENTO ---
+interface InvestmentCardProps {
+  inv: Investment;
+  investmentTrends: InvestmentTrend[];
+  onSelect: (id: string) => void;
+  onEdit: (inv: Investment) => void;
+  onDelete: (inv: Investment) => void;
+}
+
+const InvestmentCard: React.FC<InvestmentCardProps> = ({ inv, investmentTrends, onSelect, onEdit, onDelete }) => {
+    const stats = getInvestmentStats(investmentTrends, inv.id);
+    
+    return (
+      <div 
+        onClick={() => onSelect(inv.id)}
+        className="bg-white rounded-[2rem] shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden h-full flex flex-col"
+      >
+        {/* Actions (Hidden by default) */}
+        <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+           <button onClick={(e) => { e.stopPropagation(); onEdit(inv); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+           <button onClick={(e) => { e.stopPropagation(); onDelete(inv); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+        </div>
+
+        <div className="p-6 pb-4 flex-1">
+            <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors truncate pr-12">{inv.name}</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded inline-block">{inv.currency} Asset</span>
+        </div>
+
+        {stats ? (
+            <div className="px-6 pb-6 space-y-4">
+                <div className="flex justify-between items-end border-b border-slate-50 pb-3">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Attuale</span>
+                        <span className="text-xl font-black text-slate-900">{stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                        </span>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Versato</span>
+                        <span className="text-sm font-bold text-slate-600">{stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Profitto</span>
+                        <span className={`text-sm font-bold ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div className="px-6 pb-6 flex-1 flex items-center justify-center">
+                <span className="text-xs text-slate-400 italic font-medium">Nessuna rilevazione</span>
+            </div>
+        )}
+      </div>
+    );
+};
+
 export const Investments: React.FC = () => {
   const { 
     investments, 
@@ -281,31 +363,12 @@ export const Investments: React.FC = () => {
     };
   }, [investments]);
 
-  const calculateInvestmentStats = (invId: string) => {
-    const trends = investmentTrends.filter(t => t.investment_id === invId);
-    if (trends.length === 0) return null;
-
-    const sortedTrends = trends.sort((a,b) => new Date(a.value_on).getTime() - new Date(b.value_on).getTime());
-    const latest = sortedTrends[sortedTrends.length - 1];
-    const totalInvested = sortedTrends.reduce((sum, t) => sum + (t.cash_flow || 0), 0);
-    const netGain = (latest.value_original || 0) - totalInvested;
-    const roi = totalInvested !== 0 ? (netGain / totalInvested) * 100 : 0;
-
-    return {
-      latestValue: latest.value_original,
-      lastDate: latest.value_on,
-      totalInvested,
-      netGain,
-      roi
-    };
-  };
-
   const calculateGroupStats = (groupInvestments: Investment[]) => {
     let totalValue = 0;
     let totalInvested = 0;
 
     groupInvestments.forEach(inv => {
-      const stats = calculateInvestmentStats(inv.id);
+      const stats = getInvestmentStats(investmentTrends, inv.id);
       if (stats) {
         totalValue += stats.latestValue || 0;
         totalInvested += stats.totalInvested;
@@ -397,59 +460,12 @@ export const Investments: React.FC = () => {
     setDeleteDialog({ open: false });
   };
 
-  // --- COMPONENT: CARD INVESTIMENTO MIGLIORATA ---
-  const InvestmentCard = ({ inv }: { inv: Investment }) => {
-    const stats = calculateInvestmentStats(inv.id);
-    
-    return (
-      <div 
-        onClick={() => setSelectedInvestmentId(inv.id)}
-        className="bg-white rounded-[2rem] shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden h-full flex flex-col"
-      >
-        {/* Actions (Hidden by default) */}
-        <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-           <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: inv }); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-           <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, item: inv, isTrend: false }); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-        </div>
+  const handleCardEdit = (inv: Investment) => {
+    setModalState({ open: true, initialData: inv });
+  };
 
-        <div className="p-6 pb-4 flex-1">
-            <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors truncate pr-12">{inv.name}</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded inline-block">{inv.currency} Asset</span>
-        </div>
-
-        {stats ? (
-            <div className="px-6 pb-6 space-y-4">
-                <div className="flex justify-between items-end border-b border-slate-50 pb-3">
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Attuale</span>
-                        <span className="text-xl font-black text-slate-900">{stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
-                        </span>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Versato</span>
-                        <span className="text-sm font-bold text-slate-600">{stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="text-right">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Profitto</span>
-                        <span className={`text-sm font-bold ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        ) : (
-            <div className="px-6 pb-6 flex-1 flex items-center justify-center">
-                <span className="text-xs text-slate-400 italic font-medium">Nessuna rilevazione</span>
-            </div>
-        )}
-      </div>
-    );
+  const handleCardDelete = (inv: Investment) => {
+    setDeleteDialog({ open: true, item: inv, isTrend: false });
   };
 
   // --- VISTA DETTAGLIO ---
@@ -731,7 +747,7 @@ export const Investments: React.FC = () => {
           title="Elimina Elemento"
           message={
               <>
-                  Stai per eliminare <span className="font-bold text-slate-800">"{deleteDialog.isTrend ? 'Riga Storico' : selectedInvestment.name}"</span>.<br/>
+                  Stai per eliminare <span className="font-bold text-slate-800">"{deleteDialog.item?.name}"</span>.<br/>
                   {deleteDialog.isTrend ? 'Eliminare questa rilevazione cambierà i calcoli dei periodi successivi.' : 'Questa azione è irreversibile.'}
               </>
           }
@@ -792,7 +808,7 @@ export const Investments: React.FC = () => {
         </div>
         <div className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {retirement.map(inv => <InvestmentCard key={inv.id} inv={inv} />)}
+            {retirement.map(inv => <InvestmentCard key={inv.id} inv={inv} investmentTrends={investmentTrends} onSelect={setSelectedInvestmentId} onEdit={handleCardEdit} onDelete={handleCardDelete} />)}
             {retirement.length === 0 && (
               <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
@@ -839,7 +855,7 @@ export const Investments: React.FC = () => {
         </div>
         <div className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {personal.map(inv => <InvestmentCard key={inv.id} inv={inv} />)}
+            {personal.map(inv => <InvestmentCard key={inv.id} inv={inv} investmentTrends={investmentTrends} onSelect={setSelectedInvestmentId} onEdit={handleCardEdit} onDelete={handleCardDelete} />)}
             {personal.length === 0 && (
               <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">

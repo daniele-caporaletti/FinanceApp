@@ -4,6 +4,7 @@ import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
 import { AppSection } from '../types';
 import { FullScreenModal } from '../components/FullScreenModal';
+import { CustomSelect } from '../components/CustomSelect';
 
 export const Dashboard: React.FC = () => {
   const { transactions, accounts, investments, investmentTrends } = useFinance();
@@ -13,7 +14,7 @@ export const Dashboard: React.FC = () => {
   const currentMonthIndex = new Date().getMonth(); 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
-  const [isInfoOpen, setIsInfoOpen] = useState(false); // Stato per il modale Info
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 
@@ -36,8 +37,11 @@ export const Dashboard: React.FC = () => {
     const years = transactions.map(t => new Date(t.occurred_on).getFullYear());
     const unique = Array.from(new Set(years));
     if (!unique.includes(currentYear)) unique.push(currentYear);
-    return unique.sort((a, b) => b - a);
+    return unique.sort((a: number, b: number) => b - a);
   }, [transactions, currentYear]);
+
+  // Convert availableYears to options for CustomSelect
+  const yearOptions = useMemo(() => availableYears.map(y => ({ value: y, label: y.toString() })), [availableYears]);
 
   const variableExpensesMonth = useMemo(() => transactions.filter(t => {
         const d = new Date(t.occurred_on);
@@ -152,16 +156,14 @@ export const Dashboard: React.FC = () => {
            </div>
            <p className="text-slate-400 font-medium mt-1 text-sm md:text-base">Benvenuto nella tua dashboard finanziaria.</p>
         </div>
-        <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 flex items-center space-x-2 self-start md:self-auto">
+        <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 flex items-center space-x-2 self-start md:self-auto min-w-[120px]">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Anno</span>
-            <select 
-              value={selectedYear} 
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))} 
-              className="bg-transparent font-bold text-slate-900 outline-none cursor-pointer text-sm appearance-none pr-4"
-              style={{ backgroundImage: 'none' }}
-            >
-               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <CustomSelect 
+                value={selectedYear}
+                onChange={(val) => setSelectedYear(Number(val))}
+                options={yearOptions}
+                minimal={true}
+            />
         </div>
       </div>
 

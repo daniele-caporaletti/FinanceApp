@@ -5,17 +5,17 @@ import { RecurringTransaction, Category, Account, Transaction } from '../types';
 import { fetchExchangeRate } from '../utils/helpers';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { FullScreenModal } from '../components/FullScreenModal';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface RecurrenceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (rec: Partial<RecurringTransaction>) => Promise<void>;
   initialData?: Partial<RecurringTransaction>;
-  accounts: Account[];
   categories: Category[];
 }
 
-const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSave, initialData, accounts, categories }) => {
+const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSave, initialData, categories }) => {
   const [formData, setFormData] = useState<Partial<RecurringTransaction>>({});
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string>('');
@@ -26,11 +26,8 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
         name: '',
         occurred_on: new Date().toISOString().split('T')[0],
         kind: 'essential',
-        amount_original: 0,
-        account_id: accounts[0]?.id || '',
+        amount_original: undefined,
         category_id: null,
-        tag: '',
-        description: '',
         is_active: true,
         frequency: 'monthly'
       });
@@ -43,7 +40,7 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
         setSelectedParentId('');
       }
     }
-  }, [isOpen, initialData, accounts, categories]);
+  }, [isOpen, initialData, categories]);
 
   if (!isOpen) return null;
 
@@ -51,13 +48,31 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
     e.preventDefault();
     setLoading(true);
     try {
-      await onSave(formData);
+      await onSave({ ...formData, amount_original: formData.amount_original || 0 });
       onClose();
     } catch (err) { alert("Errore durante il salvataggio."); } finally { setLoading(false); }
   };
 
   const mainCategories = categories.filter(c => !c.parent_id).sort((a,b) => a.name.localeCompare(b.name));
+  const mainCategoryOptions = mainCategories.map(c => ({ value: c.id, label: c.name }));
+
   const subCategories = selectedParentId ? categories.filter(c => c.parent_id === selectedParentId).sort((a,b) => a.name.localeCompare(b.name)) : [];
+  const subCategoryOptions = [
+      { value: selectedParentId, label: 'Generica' },
+      ...subCategories.map(s => ({ value: s.id, label: s.name }))
+  ];
+
+  const frequencyOptions = [
+      { value: 'monthly', label: 'Mensile (12/anno)' },
+      { value: 'yearly', label: 'Annuale (1/anno)' }
+  ];
+
+  const typeOptions = [
+    { value: 'essential', label: 'Essential' },
+    { value: 'personal', label: 'Personal' },
+    { value: 'work', label: 'Work' },
+    { value: 'transfer', label: 'Giroconto' }
+  ];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
@@ -76,19 +91,28 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
           
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data Riferimento</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /><p className="text-[9px] text-slate-400 px-1">Il giorno sarà usato come riferimento mensile.</p></div>
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Frequenza</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={formData.frequency || 'monthly'} onChange={e => setFormData(f => ({ ...f, frequency: e.target.value as 'monthly' | 'yearly' }))}><option value="monthly">Mensile (12/anno)</option><option value="yearly">Annuale (1/anno)</option></select></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Frequenza</label><CustomSelect value={formData.frequency} onChange={(val) => setFormData(f => ({ ...f, frequency: val }))} options={frequencyOptions} /></div>
           </div>
           
           <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={formData.kind || 'essential'} onChange={e => setFormData(f => ({ ...f, kind: e.target.value as any }))}><option value="essential">Essential</option><option value="personal">Personal</option><option value="work">Work</option><option value="transfer">Giroconto</option></select></div>
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Stimato</label><input type="number" step="0.01" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.amount_original || 0} onChange={e => setFormData(f => ({ ...f, amount_original: parseFloat(e.target.value) }))} /></div>
+             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Stimato</label>
+                <input 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    placeholder="0.00"
+                    value={formData.amount_original ?? ''} 
+                    onChange={e => setFormData(f => ({ ...f, amount_original: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} 
+                />
+             </div>
           </div>
 
-          <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto</label><select required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={formData.account_id || ''} onChange={e => setFormData(f => ({ ...f, account_id: e.target.value }))}>{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({acc.currency_code})</option>)}</select></div>
-          
           <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={selectedParentId} onChange={e => { setSelectedParentId(e.target.value); setFormData(f => ({ ...f, category_id: e.target.value || null })); }}><option value="">Seleziona...</option>{mainCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none disabled:opacity-50" value={formData.category_id || ''} disabled={!selectedParentId} onChange={e => setFormData(f => ({ ...f, category_id: e.target.value }))}><option value={selectedParentId}>Generica</option>{subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
+             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
           </div>
           
           <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-2xl border border-slate-200 cursor-pointer" onClick={() => setFormData(f => ({ ...f, is_active: !f.is_active }))}>
@@ -108,28 +132,45 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
 interface ConfirmGenerationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (date: string, amount: number) => Promise<void>;
+    onConfirm: (date: string, amount: number, accountId: string) => Promise<void>;
     recurrenceName: string;
     defaultDate: string;
     defaultAmount: number;
-    currency: string;
+    accounts: Account[];
 }
 
-const ConfirmGenerationModal: React.FC<ConfirmGenerationModalProps> = ({ isOpen, onClose, onConfirm, recurrenceName, defaultDate, defaultAmount, currency }) => {
+const ConfirmGenerationModal: React.FC<ConfirmGenerationModalProps> = ({ isOpen, onClose, onConfirm, recurrenceName, defaultDate, defaultAmount, accounts }) => {
     const [date, setDate] = useState(defaultDate);
-    const [amount, setAmount] = useState(defaultAmount);
+    const [amount, setAmount] = useState<number | undefined>(defaultAmount);
+    const [accountId, setAccountId] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Filtra i conti attivi e visibili in overview
+    const visibleAccounts = useMemo(() => {
+        return accounts.filter(a => a.status === 'active' && !a.exclude_from_overview);
+    }, [accounts]);
+
+    const accountOptions = visibleAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.currency_code})` }));
 
     useEffect(() => { 
         setDate(defaultDate); 
         setAmount(defaultAmount);
-    }, [defaultDate, defaultAmount, isOpen]);
+        // RIMOSSO: setAccountId(visibleAccounts[0].id); -> Ora l'utente deve selezionare esplicitamente
+        setAccountId('');
+    }, [defaultDate, defaultAmount, isOpen, visibleAccounts]);
 
     if (!isOpen) return null;
 
+    const selectedAccount = accounts.find(a => a.id === accountId);
+    const currency = selectedAccount?.currency_code || 'CHF';
+
     const handleConfirm = async () => {
+        if (!accountId) {
+          alert("Seleziona un conto.");
+          return;
+        }
         setLoading(true);
-        await onConfirm(date, amount);
+        await onConfirm(date, amount || 0, accountId);
         setLoading(false);
         onClose();
     };
@@ -145,9 +186,21 @@ const ConfirmGenerationModal: React.FC<ConfirmGenerationModalProps> = ({ isOpen,
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data Effettiva</label>
                         <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500" value={date} onChange={e => setDate(e.target.value)} />
                     </div>
+                    
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto di Pagamento</label>
+                        <CustomSelect value={accountId} onChange={(val) => setAccountId(val)} options={accountOptions} placeholder="Seleziona..." />
+                    </div>
+
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Reale ({currency})</label>
-                        <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500" value={amount} onChange={e => setAmount(parseFloat(e.target.value))} />
+                        <input 
+                            type="number" 
+                            step="0.01" 
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                            value={amount ?? ''} 
+                            onChange={e => setAmount(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                        />
                         <p className="text-[9px] text-slate-400 leading-tight px-1">Modifica l'importo se quest'anno la cifra è diversa dal solito. La ricorrenza originale non verrà modificata.</p>
                     </div>
                 </div>
@@ -184,7 +237,7 @@ export const Recurrences: React.FC = () => {
         return d.getMonth() === monthIndex && 
                d.getFullYear() === year && 
                // Controllo un po' più lasso sull'importo: se c'è un movimento con lo stesso nome in quel mese, lo considero pagato, anche se l'importo differisce
-               (t.description === rec.name || t.description === rec.description);
+               (t.description === rec.name);
     });
     return !!found;
   };
@@ -199,6 +252,7 @@ export const Recurrences: React.FC = () => {
         const isYearly = rec.frequency === 'yearly';
         const multiplier = isYearly ? 1 : 12;
 
+        // Dato che non abbiamo un conto associato, assumiamo che amount_original sia un valore nominale (sommiamo come fossero CHF per la stima)
         totalProjected += Math.abs(rec.amount_original) * multiplier;
 
         const recMonth = new Date(rec.occurred_on).getMonth();
@@ -214,7 +268,8 @@ export const Recurrences: React.FC = () => {
             });
 
             if (foundTx) {
-                totalPaid += Math.abs(foundTx.amount_original); // Usiamo l'importo reale pagato
+                // Per il pagato usiamo la base convertita in CHF, dato che il movimento reale esiste
+                totalPaid += Math.abs(foundTx.amount_base || foundTx.amount_original);
             }
         }
     });
@@ -226,12 +281,12 @@ export const Recurrences: React.FC = () => {
     };
   }, [sortedRecurrences, transactions, selectedYear]);
 
-  const handleGenerate = async (date: string, amount: number) => {
+  const handleGenerate = async (date: string, amount: number, accountId: string) => {
     if (!genModal.recurrence) return;
     const rec = genModal.recurrence;
     
     // Calcolo amount_base (CHF) se necessario
-    const account = accounts.find(a => a.id === rec.account_id);
+    const account = accounts.find(a => a.id === accountId);
     const currency = account?.currency_code || 'CHF';
     
     let amount_base = amount;
@@ -243,11 +298,11 @@ export const Recurrences: React.FC = () => {
     await addTransaction({
         occurred_on: date,
         kind: rec.kind,
-        account_id: rec.account_id,
+        account_id: accountId,
         amount_original: amount, // Uso l'importo inserito dall'utente (che può essere diverso dal template)
         amount_base: amount_base,
         category_id: rec.category_id,
-        tag: rec.tag,
+        tag: null, // Nessun tag dal template
         description: rec.name,
         user_id: rec.user_id
     });
@@ -258,11 +313,6 @@ export const Recurrences: React.FC = () => {
     const current = new Date().getFullYear();
     return [current - 1, current, current + 1];
   }, []);
-
-  const getCurrencyForRecurrence = (rec: RecurringTransaction) => {
-      const acc = accounts.find(a => a.id === rec.account_id);
-      return acc?.currency_code || 'CHF';
-  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -346,7 +396,7 @@ export const Recurrences: React.FC = () => {
                                        {isYearly && <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[9px] font-bold uppercase border border-purple-100">1/Y</span>}
                                     </div>
                                     <div className="text-[10px] font-medium text-slate-400 uppercase mt-0.5">
-                                        CHF {Math.abs(rec.amount_original).toLocaleString('it-IT')} • Giorno {recDay}
+                                        Valore: {Math.abs(rec.amount_original).toLocaleString('it-IT')} • Giorno {recDay}
                                     </div>
                                 </td>
                                 {monthNames.map((_, idx) => {
@@ -415,7 +465,7 @@ export const Recurrences: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end">
                        <span className="font-black text-slate-900 text-lg">
-                           {Math.abs(rec.amount_original).toLocaleString('it-IT')} <span className="text-xs text-slate-400">CHF</span>
+                           {Math.abs(rec.amount_original).toLocaleString('it-IT')}
                        </span>
                     </div>
                  </div>
@@ -477,7 +527,7 @@ export const Recurrences: React.FC = () => {
          )}
       </div>
 
-      <RecurrenceModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateRecurring(r.id, r); else await addRecurring(r); }} initialData={modalState.initialData} accounts={accounts} categories={categories} />
+      <RecurrenceModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateRecurring(r.id, r); else await addRecurring(r); }} initialData={modalState.initialData} categories={categories} />
       
       <ConfirmGenerationModal 
         isOpen={genModal.open} 
@@ -486,7 +536,7 @@ export const Recurrences: React.FC = () => {
         recurrenceName={genModal.recurrence?.name || ''} 
         defaultDate={genModal.defaultDate}
         defaultAmount={genModal.recurrence?.amount_original || 0}
-        currency={genModal.recurrence ? getCurrencyForRecurrence(genModal.recurrence) : 'CHF'}
+        accounts={accounts}
       />
 
       <ConfirmModal 
@@ -517,15 +567,11 @@ export const Recurrences: React.FC = () => {
               <ul className="space-y-3">
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Creazione Template:</span> Crea una ricorrenza definendo importo, giorno del mese e categoria.</p>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Creazione Template:</span> Crea una ricorrenza definendo importo, giorno del mese e categoria. Non serve specificare il conto in questa fase.</p>
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Generazione:</span> Ogni mese, clicca sul pallino corrispondente nella griglia per generare il movimento reale. Il pallino diventerà verde.</p>
-                 </li>
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Stato:</span> Se il pallino è verde, significa che esiste un movimento nei "Movimenti" con lo stesso nome nel mese corrente.</p>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Generazione:</span> Ogni mese, clicca sul pallino corrispondente nella griglia. Si aprirà un popup dove potrai scegliere <strong>da quale conto</strong> effettuare il pagamento e confermare l'importo.</p>
                  </li>
               </ul>
            </div>

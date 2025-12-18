@@ -36,11 +36,8 @@ export interface RecurringTransaction {
   is_active: boolean;
   occurred_on: string; // Usato come data di riferimento (es. giorno del mese)
   kind: 'income' | 'expense' | 'transfer' | string;
-  account_id: string;
   amount_original: number;
   category_id: string | null;
-  tag: string | null;
-  description: string | null;
   frequency?: 'monthly' | 'yearly';
 }
 

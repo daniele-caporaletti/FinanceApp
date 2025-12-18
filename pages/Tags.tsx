@@ -318,7 +318,7 @@ export const Tags: React.FC = () => {
                               </span>
                             </td>
                           </tr>
-                          {isExpanded && Object.entries(cat.subs).map(([subName, subData]) => (
+                          {isExpanded && Object.entries(cat.subs).map(([subName, subData]: [string, { total: number; id: string }]) => (
                             <tr 
                               key={subName} 
                               onClick={() => setDrillDownId(subData.id)}
@@ -374,7 +374,7 @@ export const Tags: React.FC = () => {
                             {/* Subs List */}
                             {isExpanded && (
                                <div className="bg-slate-50 pl-8 pr-4 py-2 space-y-2">
-                                  {Object.entries(cat.subs).map(([subName, subData]) => (
+                                  {Object.entries(cat.subs).map(([subName, subData]: [string, { total: number; id: string }]) => (
                                      <div 
                                         key={subName} 
                                         onClick={() => setDrillDownId(subData.id)}

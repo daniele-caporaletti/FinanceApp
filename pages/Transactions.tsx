@@ -6,6 +6,7 @@ import { Transaction, Category, Account } from '../types';
 import { fetchExchangeRate } from '../utils/helpers';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { FullScreenModal } from '../components/FullScreenModal';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface FilterState {
   search: string;
@@ -33,15 +34,38 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string>('');
 
+  // Filtra i conti attivi e visibili in overview
+  const visibleAccounts = useMemo(() => {
+    return accounts.filter(a => a.status === 'active' && !a.exclude_from_overview);
+  }, [accounts]);
+
+  // Options prep
+  const typeOptions = [
+    { value: 'essential', label: 'Essential' },
+    { value: 'personal', label: 'Personal' },
+    { value: 'work', label: 'Work' },
+    { value: 'transfer', label: 'Giroconto' }
+  ];
+
+  const accountOptions = visibleAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.currency_code})` }));
+  const mainCategories = categories.filter(c => !c.parent_id).sort((a,b) => a.name.localeCompare(b.name));
+  const mainCategoryOptions = mainCategories.map(c => ({ value: c.id, label: c.name }));
+  
+  const subCategories = selectedParentId ? categories.filter(c => c.parent_id === selectedParentId).sort((a,b) => a.name.localeCompare(b.name)) : [];
+  const subCategoryOptions = [
+      { value: selectedParentId, label: 'Generica' },
+      ...subCategories.map(s => ({ value: s.id, label: s.name }))
+  ];
+
   useEffect(() => {
     if (isOpen) {
       const initialKind = initialData?.kind || 'essential';
       setFormData(initialData || {
         occurred_on: new Date().toISOString().split('T')[0],
         kind: initialKind,
-        amount_original: 0,
+        amount_original: undefined,
         amount_base: 0,
-        account_id: accounts[0]?.id || '',
+        account_id: initialData?.account_id || '', // Non pre-selezionare il primo conto
         category_id: null,
         tag: '',
         description: ''
@@ -61,6 +85,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.account_id) {
+        alert("Seleziona un conto per procedere.");
+        return;
+    }
     setLoading(true);
     try {
       const selectedAccount = accounts.find(a => a.id === formData.account_id);
@@ -79,8 +107,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
     } catch (err) { alert("Errore durante il salvataggio."); } finally { setLoading(false); }
   };
 
-  const mainCategories = categories.filter(c => !c.parent_id).sort((a,b) => a.name.localeCompare(b.name));
-  const subCategories = selectedParentId ? categories.filter(c => c.parent_id === selectedParentId).sort((a,b) => a.name.localeCompare(b.name)) : [];
   const selectedAccount = accounts.find(a => a.id === formData.account_id);
   const currencyLabel = selectedAccount?.currency_code || 'CHF';
 
@@ -99,15 +125,29 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /></div>
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={formData.kind || 'essential'} onChange={e => setFormData(f => ({ ...f, kind: e.target.value }))}><option value="essential">Essential</option><option value="personal">Personal</option><option value="work">Work</option><option value="transfer">Giroconto</option></select></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
           </div>
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto</label><select required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={formData.account_id || ''} onChange={e => setFormData(f => ({ ...f, account_id: e.target.value }))}>{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({acc.currency_code})</option>)}</select></div>
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo ({currencyLabel})</label><input type="number" step="0.01" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.amount_original || 0} onChange={e => setFormData(f => ({ ...f, amount_original: parseFloat(e.target.value) }))} /></div>
+            <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto</label>
+                <CustomSelect value={formData.account_id} onChange={(val) => setFormData(f => ({ ...f, account_id: val }))} options={accountOptions} placeholder="Seleziona..." />
+            </div>
+            <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo ({currencyLabel})</label>
+                <input 
+                    type="number" 
+                    step="0.01" 
+                    required 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    placeholder="0.00"
+                    value={formData.amount_original ?? ''} 
+                    onChange={e => setFormData(f => ({ ...f, amount_original: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} 
+                />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none" value={selectedParentId} onChange={e => { setSelectedParentId(e.target.value); setFormData(f => ({ ...f, category_id: e.target.value || null })); }}><option value="">Seleziona...</option>{mainCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 appearance-none disabled:opacity-50" value={formData.category_id || ''} disabled={!selectedParentId} onChange={e => setFormData(f => ({ ...f, category_id: e.target.value }))}><option value={selectedParentId}>Generica</option>{subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
+             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
           </div>
           <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tag</label><input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. vacanze..." value={formData.tag || ''} onChange={e => setFormData(f => ({ ...f, tag: e.target.value }))} /></div>
           <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Descrizione</label><textarea rows={2} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 resize-none" placeholder="..." value={formData.description || ''} onChange={e => setFormData(f => ({ ...f, description: e.target.value }))} /></div>
@@ -154,7 +194,7 @@ export const Transactions: React.FC = () => {
     const years = transactions.map(t => new Date(t.occurred_on).getFullYear());
     const unique = Array.from(new Set(years));
     if (!unique.includes(parseInt(currentYear))) unique.push(parseInt(currentYear));
-    return unique.sort((a, b) => b - a).map(String);
+    return unique.sort((a: number, b: number) => b - a).map(String);
   }, [transactions, currentYear]);
 
   const getCategoryInfo = (id: string | null) => {
@@ -266,9 +306,9 @@ export const Transactions: React.FC = () => {
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
                 <div className="space-y-4">
                     <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
-                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium outline-none appearance-none" value={filters.category} onChange={e => setFilters(f => ({ ...f, category: e.target.value, subcategory: '' }))}><option value="">Tutte</option>{mainCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select>
-                    <select disabled={!filters.category} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium outline-none appearance-none disabled:opacity-50" value={filters.subcategory} onChange={e => setFilters(f => ({ ...f, subcategory: e.target.value }))}><option value="">Sottocategoria</option>{subCategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium outline-none appearance-none" value={filters.tag} onChange={e => setFilters(f => ({ ...f, tag: e.target.value }))}><option value="">Tag</option>{tagOptions.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                    <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} />
+                    <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
+                    <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} />
                 </div>
                 <div className="space-y-4">
                     <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Tipo</h4>

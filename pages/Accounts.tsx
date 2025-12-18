@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Account } from '../types';
 import { FullScreenModal } from '../components/FullScreenModal';
+import { CustomSelect } from '../components/CustomSelect';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -41,6 +42,17 @@ const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onSave, in
     }
   };
 
+  const currencyOptions = [
+      { value: 'CHF', label: 'CHF' },
+      { value: 'EUR', label: 'EUR' },
+      { value: 'USD', label: 'USD' }
+  ];
+
+  const statusOptions = [
+      { value: 'active', label: 'Attivo' },
+      { value: 'inactive', label: 'Inattivo' }
+  ];
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
@@ -67,26 +79,11 @@ const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onSave, in
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Valuta</label>
-              <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-semibold appearance-none"
-                value={formData.currency_code || 'CHF'}
-                onChange={e => setFormData(f => ({ ...f, currency_code: e.target.value }))}
-              >
-                <option value="CHF">CHF</option>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-              </select>
+              <CustomSelect value={formData.currency_code} onChange={(val) => setFormData(f => ({ ...f, currency_code: val }))} options={currencyOptions} />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Stato</label>
-              <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all font-semibold appearance-none"
-                value={formData.status || 'active'}
-                onChange={e => setFormData(f => ({ ...f, status: e.target.value }))}
-              >
-                <option value="active">Attivo</option>
-                <option value="inactive">Inattivo</option>
-              </select>
+              <CustomSelect value={formData.status} onChange={(val) => setFormData(f => ({ ...f, status: val }))} options={statusOptions} />
             </div>
           </div>
 

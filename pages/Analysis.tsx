@@ -50,7 +50,7 @@ export const Analysis: React.FC = () => {
     const years = transactions.map(t => new Date(t.occurred_on).getFullYear());
     const unique = Array.from(new Set(years));
     if (!unique.includes(currentYear)) unique.push(currentYear);
-    return unique.sort((a, b) => b - a);
+    return unique.sort((a: number, b: number) => b - a);
   }, [transactions, currentYear]);
 
   // 3. KPI Calculations
