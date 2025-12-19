@@ -558,17 +558,17 @@ export const Dashboard: React.FC = () => {
                                {/* Lavoro (Entrate + Uscite) */}
                                <td className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-amber-50/50 transition-colors">
                                   <div className="flex flex-col gap-0.5 items-center justify-center">
-                                      {/* Work Income (Positive - Green) */}
+                                      {/* Work Income (Positive - Lighter Yellow) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'work_income')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workIncome !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}
+                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workIncome !== 0 ? 'text-amber-500' : 'text-slate-300'}`}
                                       >
                                         {data.workIncome !== 0 ? data.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
-                                      {/* Work Expense (Negative - Red) */}
+                                      {/* Work Expense (Negative - Reddish Yellow) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'work_expense')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workExpense !== 0 ? 'text-rose-500' : 'text-slate-300'}`}
+                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workExpense !== 0 ? 'text-orange-600' : 'text-slate-300'}`}
                                       >
                                         {data.workExpense !== 0 ? data.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
@@ -597,8 +597,8 @@ export const Dashboard: React.FC = () => {
                          </td>
                          <td className="px-2 py-2 text-center align-middle">
                              <div className="flex flex-col gap-0.5 items-center justify-center">
-                                <span onClick={() => goToTransactions(-1, 'work_income')} className="text-[10px] font-mono font-bold text-emerald-600 leading-none cursor-pointer hover:underline">{matrixTotals.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
-                                <span onClick={() => goToTransactions(-1, 'work_expense')} className="text-[10px] font-mono font-bold text-rose-500 leading-none cursor-pointer hover:underline">{matrixTotals.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'work_income')} className="text-[10px] font-mono font-bold text-amber-500 leading-none cursor-pointer hover:underline">{matrixTotals.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'work_expense')} className="text-[10px] font-mono font-bold text-orange-600 leading-none cursor-pointer hover:underline">{matrixTotals.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                              </div>
                          </td>
                          <td className={`px-2 py-2 text-center font-mono text-xs font-black align-middle ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
@@ -631,7 +631,7 @@ export const Dashboard: React.FC = () => {
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Nel <strong>Cashflow</strong>, la colonna "Lavoro" separa le entrate (verde, sopra) dalle uscite (rosso, sotto) classificate come 'Work'.</p>
+                    <p className="text-sm text-slate-600">Nel <strong>Cashflow</strong>, la colonna "Lavoro" separa le entrate (giallo chiaro, sopra) dalle uscite (arancio scuro, sotto) classificate come 'Work'.</p>
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
