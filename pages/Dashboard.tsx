@@ -69,19 +69,25 @@ export const Dashboard: React.FC = () => {
 
   // --- CALCOLI WIDGET ---
 
-  // 1. Patrimonio (SEMPRE ATTUALE - NON DIPENDE DAI FILTRI TEMPORALI)
+  // 1. Patrimonio (OPTIMIZED)
   const wealthData = useMemo(() => {
-    // A. Liquidità (Current)
-    const includedAccounts = accounts.filter(a => !a.exclude_from_overview);
+    // A. Liquidità (Single Pass Calculation)
+    const accountBalances: Record<string, number> = {};
+    
+    transactions.forEach(t => {
+        const amount = t.amount_original || 0;
+        let val = 0;
+        if (t.kind === 'expense') val = -Math.abs(amount);
+        else if (t.kind === 'income') val = Math.abs(amount);
+        else val = amount;
+        
+        accountBalances[t.account_id] = (accountBalances[t.account_id] || 0) + val;
+    });
+
     let liquidityCHF = 0;
-    includedAccounts.forEach(acc => {
-      const nativeBalance = transactions.filter(t => t.account_id === acc.id).reduce((sum, t) => {
-           const amount = t.amount_original || 0;
-           if (t.kind === 'expense') return sum - Math.abs(amount);
-           if (t.kind === 'income') return sum + Math.abs(amount);
-           return sum + amount;
-        }, 0);
-      liquidityCHF += nativeBalance * (rates[acc.currency_code] || 1);
+    accounts.filter(a => !a.exclude_from_overview).forEach(acc => {
+      const balance = accountBalances[acc.id] || 0;
+      liquidityCHF += balance * (rates[acc.currency_code] || 1);
     });
 
     // B. Investimenti (Current - Latest Trend available)
@@ -95,10 +101,27 @@ export const Dashboard: React.FC = () => {
       }
     });
 
-    return { liquidity: liquidityCHF, investments: investmentsCHF, total: liquidityCHF + investmentsCHF };
-  }, [accounts, transactions, investments, investmentTrends, rates]); // Rimosso selectedYear/Month dalle dipendenze
+    return { liquidity: liquidityCHF, investments: investmentsCHF };
+  }, [accounts, transactions, investments, investmentTrends, rates]); 
 
-  // 2. Pulse (Basato su selectedMonth e selectedYear)
+  // 2. Variabili Mese Corrente (SEMPRE ATTUALE REALE - NON DIPENDE DAI FILTRI)
+  const currentMonthRealVariables = useMemo(() => {
+      const now = new Date();
+      const currentY = now.getFullYear();
+      const currentM = now.getMonth();
+
+      let total = 0;
+      transactions.forEach(t => {
+          const [tY, tM] = t.occurred_on.split('-').map(Number);
+          // Filtra solo mese corrente reale, tipo personal, uscite
+          if (tY === currentY && (tM - 1) === currentM && t.kind === 'personal' && (t.amount_base || 0) < 0) {
+              total += Math.abs(t.amount_base || 0);
+          }
+      });
+      return total;
+  }, [transactions]);
+
+  // 3. Pulse (Basato su selectedMonth e selectedYear)
   const currentMonthStats = useMemo(() => {
       let income = 0;
       let variableExpense = 0; // Absolute value
@@ -136,33 +159,46 @@ export const Dashboard: React.FC = () => {
       return { income, fixedExpense, variableExpense, totalExpense, variablePct, fixedPct, incomePct, netBalance };
   }, [transactions, selectedYear, selectedMonth]);
 
-  // 3. Status Spese Essenziali (Basato su selectedMonth e selectedYear)
-  const essentialsStatus = useMemo(() => {
+  // 4. Status Spese Essenziali & Giroconti (Basato su selectedMonth e selectedYear)
+  // Divide le statistiche in due gruppi: Spese (expense/essential) e Giroconti (transfer)
+  const essentialsBreakdown = useMemo(() => {
       const activeEssentials = essentialTransactions.filter(e => {
           const [eYear, eMonth] = e.occurred_on.split('-').map(Number);
-          return e.is_active && eYear === selectedYear && (eMonth - 1) === selectedMonth;
+          return eYear === selectedYear && (eMonth - 1) === selectedMonth;
       });
 
-      const total = activeEssentials.length;
-      let paid = 0;
-      let remainingAmount = 0;
+      const expenses = { total: 0, paid: 0, remainingAmount: 0 };
+      const transfers = { total: 0, paid: 0, remainingAmount: 0 };
 
-      activeEssentials.forEach(ess => {
-          const isPaid = transactions.some(t => {
-              return t.essential_transaction_id === ess.id;
-          });
-
-          if (isPaid) {
-              paid++;
-          } else {
-              remainingAmount += Math.abs(ess.amount_original);
+      // Pre-calculate payments map for this specific breakdown
+      const paymentsMap = new Set<string>();
+      transactions.forEach(t => {
+          if (t.essential_transaction_id) {
+              paymentsMap.add(`${t.essential_transaction_id}-${t.kind}`);
           }
       });
 
-      return { total, paid, remainingAmount };
+      activeEssentials.forEach(ess => {
+          const amount = Math.abs(ess.amount_original);
+
+          if (ess.kind === 'transfer') {
+              const isPaid = paymentsMap.has(`${ess.id}-transfer`);
+              transfers.total++;
+              if (isPaid) transfers.paid++;
+              else transfers.remainingAmount += amount;
+          } else {
+              // Check if any payment exists that is NOT a transfer
+              const isPaid = Array.from(paymentsMap).some(key => key.startsWith(ess.id) && !key.endsWith('transfer'));
+              expenses.total++;
+              if (isPaid) expenses.paid++;
+              else expenses.remainingAmount += amount;
+          }
+      });
+
+      return { expenses, transfers };
   }, [essentialTransactions, transactions, selectedYear, selectedMonth]);
 
-  // 4. Ultimi Movimenti (Filtrati per MESE selezionato)
+  // 5. Ultimi Movimenti (Filtrati per MESE selezionato)
   const recentTransactions = useMemo(() => {
       return transactions
         .filter(t => {
@@ -178,26 +214,41 @@ export const Dashboard: React.FC = () => {
         .slice(0, 9); // Max 9 items
   }, [transactions, selectedYear, selectedMonth]);
 
-  // 4b. Essential Expenses List (Filtered by selectedMonth)
-  const currentMonthEssentials = useMemo(() => {
+  // 6. Lista Essenziali & Giroconti (Filtered by selectedMonth)
+  const groupedEssentials = useMemo(() => {
       const active = essentialTransactions.filter(e => {
           const [eYear, eMonth] = e.occurred_on.split('-').map(Number);
-          return e.is_active && eYear === selectedYear && (eMonth - 1) === selectedMonth;
+          return eYear === selectedYear && (eMonth - 1) === selectedMonth;
       });
       
-      return active.map(rec => {
-          const isPaid = transactions.some(t => t.essential_transaction_id === rec.id);
+      const mapped = active.map(rec => {
           const parts = rec.occurred_on.split('-');
           const day = parseInt(parts[2]);
+          
+          let isPaid = false;
+          if (rec.kind === 'transfer') {
+              isPaid = transactions.some(t => t.essential_transaction_id === rec.id && t.kind === 'transfer');
+          } else {
+              isPaid = transactions.some(t => t.essential_transaction_id === rec.id && t.kind !== 'transfer');
+          }
 
           return { ...rec, isPaid, day };
-      }).sort((a, b) => {
+      });
+
+      const expenses = mapped.filter(r => r.kind !== 'transfer').sort((a, b) => {
           if (a.isPaid === b.isPaid) return a.day - b.day;
           return a.isPaid ? 1 : -1;
       });
+
+      const transfers = mapped.filter(r => r.kind === 'transfer').sort((a, b) => {
+          if (a.isPaid === b.isPaid) return a.day - b.day;
+          return a.isPaid ? 1 : -1;
+      });
+
+      return { expenses, transfers };
   }, [essentialTransactions, transactions, selectedYear, selectedMonth]);
 
-  // 5. Matrice Dati (Sempre Annuale, ma evidenzia mese corrente)
+  // 7. Matrice Dati (Sempre Annuale, ma evidenzia mese corrente)
   const matrixData = useMemo(() => {
     const data = Array.from({ length: 12 }, () => ({ income: 0, variable: 0, fixed: 0, workIncome: 0, workExpense: 0 }));
     transactions.forEach(t => {
@@ -265,9 +316,24 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* NET WORTH SECTION (Liquidità + Investimenti) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              {/* CARD 1: LIQUIDITA' */}
+          {/* TOP CARDS SECTION (3 COLUMNS) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              
+              {/* CARD 1: USCITE VARIABILI (MESE CORRENTE REALE) */}
+              <div 
+                onClick={() => navigateTo(AppSection.Analisi)}
+                className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
+              >
+                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>
+                 <div className="relative z-10">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Uscite Variabili (Mese)
+                    </span>
+                    <div className="text-2xl font-black text-slate-900 tracking-tight">CHF {currentMonthRealVariables.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                 </div>
+              </div>
+
+              {/* CARD 2: LIQUIDITA' */}
               <div 
                 onClick={() => navigateTo(AppSection.Conti)}
                 className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
@@ -281,7 +347,7 @@ export const Dashboard: React.FC = () => {
                  </div>
               </div>
 
-              {/* CARD 2: INVESTIMENTI (Con Pulsante Blur) */}
+              {/* CARD 3: INVESTIMENTI (Ripristinata) */}
               <div 
                 onClick={() => navigateTo(AppSection.Investimenti)}
                 className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
@@ -292,7 +358,7 @@ export const Dashboard: React.FC = () => {
                  <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-1">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Investimenti (Personali)
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Investimenti
                         </span>
                         {/* Blur Toggle Button Inline */}
                         <button 
@@ -312,6 +378,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                  </div>
               </div>
+
           </div>
       </div>
 
@@ -336,7 +403,7 @@ export const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* 2. ANALISI MENSILE (Pulse, Essentials) */}
+      {/* 2. ANALISI MENSILE (Pulse, Essentials Split) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           
           {/* Widget: Situazione Mensile (Compact) */}
@@ -375,23 +442,43 @@ export const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* Widget: Spese Essenziali (Compact) */}
-          <div onClick={() => navigateTo(AppSection.SpeseEssenziali)} className="bg-slate-900 p-4 rounded-[1.5rem] shadow-lg shadow-slate-200 cursor-pointer hover:bg-slate-800 transition-colors text-white relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-0 right-0 p-3 opacity-10"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="m9 14 2 2 4-4" /></svg></div>
-              <div>
-                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10">Spese Essenziali</h3>
-                  <div className="flex items-baseline gap-1 relative z-10">
-                      <span className="text-2xl font-black">{essentialsStatus.paid}</span>
-                      <span className="text-sm font-medium text-slate-500">/ {essentialsStatus.total}</span>
+          {/* Widget: Spese Essenziali & Giroconti (Split) - REDESIGNED */}
+          <div onClick={() => navigateTo(AppSection.SpeseEssenziali)} className="bg-white p-0 rounded-[1.5rem] border border-slate-200 shadow-sm cursor-pointer hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between h-[110px] md:h-auto">
+              {/* Spese */}
+              <div className="p-4 flex-1 flex flex-col justify-center relative">
+                  <div className="flex justify-between items-end relative z-10">
+                      <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">Essenziali (Spese)</h3>
+                          <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-black text-slate-900">{essentialsBreakdown.expenses.paid}</span>
+                              <span className="text-xs font-medium text-slate-400">/ {essentialsBreakdown.expenses.total}</span>
+                          </div>
+                      </div>
+                      <div className="text-right">
+                          <span className="text-[9px] text-slate-400 uppercase font-bold block">Rimanente</span>
+                          <span className="text-sm font-bold text-rose-500">{essentialsBreakdown.expenses.remainingAmount > 0 ? `~ ${essentialsBreakdown.expenses.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'}</span>
+                      </div>
                   </div>
               </div>
-              
-              {essentialsStatus.remainingAmount > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-700 relative z-10">
-                      <p className="text-[8px] text-slate-400 uppercase font-bold">Rimanente stimato</p>
-                      <p className="text-xs font-bold text-white">~ {essentialsStatus.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+
+              <div className="w-full h-px bg-slate-100"></div>
+
+              {/* Giroconti */}
+              <div className="p-4 flex-1 flex flex-col justify-center relative bg-slate-50/50">
+                  <div className="flex justify-between items-end relative z-10">
+                      <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">Giroconti</h3>
+                          <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-black text-slate-900">{essentialsBreakdown.transfers.paid}</span>
+                              <span className="text-xs font-medium text-slate-400">/ {essentialsBreakdown.transfers.total}</span>
+                          </div>
+                      </div>
+                      <div className="text-right">
+                          <span className="text-[9px] text-slate-400 uppercase font-bold block">Da spostare</span>
+                          <span className="text-sm font-bold text-blue-500">{essentialsBreakdown.transfers.remainingAmount > 0 ? `~ ${essentialsBreakdown.transfers.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'}</span>
+                      </div>
                   </div>
-              )}
+              </div>
           </div>
       </div>
 
@@ -413,7 +500,7 @@ export const Dashboard: React.FC = () => {
                         onClick={() => setListTab('essential')}
                         className={`text-sm font-bold uppercase tracking-wide transition-colors ${listTab === 'essential' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                       >
-                        Fisse ({monthNames[selectedMonth]})
+                        Essenziali ({monthNames[selectedMonth]})
                       </button>
                   </div>
                   <button onClick={() => navigateTo(listTab === 'recent' ? AppSection.Movimenti : AppSection.SpeseEssenziali)} className="text-xs font-bold text-blue-600 hover:underline">Vedi Tutti</button>
@@ -453,44 +540,89 @@ export const Dashboard: React.FC = () => {
                       </>
                   )}
 
-                  {/* TAB: Spese Fisse (Essenziali) del Mese */}
+                  {/* TAB: Essenziali (Spese & Giroconti) */}
                   {listTab === 'essential' && (
-                      <>
-                        {currentMonthEssentials.map(rec => (
-                            <div 
-                                key={rec.id} 
-                                onClick={() => navigateTo(AppSection.SpeseEssenziali)}
-                                className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3 cursor-pointer group"
-                            >
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${rec.isPaid ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-300 group-hover:border-blue-200'}`}>
-                                        {rec.isPaid ? (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                                        ) : (
-                                            <span className="text-[9px] font-bold">{rec.day}</span>
-                                        )}
+                      <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                        {/* Spese */}
+                        {groupedEssentials.expenses.length > 0 && (
+                            <>
+                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 backdrop-blur-sm">Spese Fisse</div>
+                                {groupedEssentials.expenses.map(rec => (
+                                    <div 
+                                        key={rec.id} 
+                                        onClick={() => navigateTo(AppSection.SpeseEssenziali)}
+                                        className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${rec.isPaid ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-300 group-hover:border-rose-200'}`}>
+                                                {rec.isPaid ? (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold">{rec.day}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className={`text-xs font-black truncate ${rec.isPaid ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-800'}`}>
+                                                    {rec.name}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {rec.isPaid ? 'Pagato' : `Scade il ${rec.day}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex-shrink-0 text-right">
+                                            <span className={`text-xs font-black block ${rec.isPaid ? 'text-slate-300' : 'text-rose-600'}`}>
+                                                {Math.abs(rec.amount_original).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">{rec.currency_original}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col min-w-0">
-                                        <span className={`text-xs font-black truncate ${rec.isPaid ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-800'}`}>
-                                            {rec.name}
-                                        </span>
-                                        <span className="text-[10px] font-bold text-slate-400">
-                                            {rec.isPaid ? 'Pagato' : `Scade il ${rec.day}`}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex-shrink-0 text-right">
-                                    <span className={`text-xs font-black block ${rec.isPaid ? 'text-slate-300' : 'text-slate-900'}`}>
-                                        {Math.abs(rec.amount_original).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{rec.currency_original}</span>
-                                </div>
-                            </div>
-                        ))}
-                        {currentMonthEssentials.length === 0 && (
-                            <div className="p-8 text-center text-slate-400 text-xs font-medium">Nessuna spesa essenziale trovata per questo periodo ({monthNames[selectedMonth]} {selectedYear}).</div>
+                                ))}
+                            </>
                         )}
-                      </>
+
+                        {/* Giroconti Separator */}
+                        {groupedEssentials.transfers.length > 0 && (
+                            <>
+                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 backdrop-blur-sm mt-2 border-t border-slate-100">Giroconti</div>
+                                {groupedEssentials.transfers.map(rec => (
+                                    <div 
+                                        key={rec.id} 
+                                        onClick={() => navigateTo(AppSection.SpeseEssenziali)}
+                                        className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${rec.isPaid ? 'bg-blue-100 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-300 group-hover:border-blue-200'}`}>
+                                                {rec.isPaid ? (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold">{rec.day}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className={`text-xs font-black truncate ${rec.isPaid ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-800'}`}>
+                                                    {rec.name}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {rec.isPaid ? 'Eseguito' : `Previsto il ${rec.day}`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex-shrink-0 text-right">
+                                            <span className={`text-xs font-black block ${rec.isPaid ? 'text-slate-300' : 'text-blue-600'}`}>
+                                                {Math.abs(rec.amount_original).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">{rec.currency_original}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+
+                        {groupedEssentials.expenses.length === 0 && groupedEssentials.transfers.length === 0 && (
+                            <div className="p-8 text-center text-slate-400 text-xs font-medium">Nessuna voce essenziale trovata per {monthNames[selectedMonth]} {selectedYear}.</div>
+                        )}
+                      </div>
                   )}
 
               </div>
