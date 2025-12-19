@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Investment, InvestmentTrend } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -276,6 +275,96 @@ const getInvestmentStats = (trends: InvestmentTrend[], invId: string) => {
       roi
     };
 };
+
+// --- MOBILE SWIPEABLE ITEM FOR TRENDS ---
+interface SwipeableTrendProps { 
+  children: React.ReactNode; 
+  onEdit: () => void; 
+  onDelete: () => void;
+}
+
+const SwipeableTrendItem: React.FC<SwipeableTrendProps> = ({ children, onEdit, onDelete }) => {
+  const [offsetX, setOffsetX] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const isSwiping = useRef(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    isSwiping.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStartX.current;
+    
+    if (Math.abs(diff) > 5) {
+        isSwiping.current = true;
+        if (diff > -150 && diff < 150) {
+            setOffsetX(diff);
+        }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (Math.abs(offsetX) > 80) {
+      if (offsetX > 0) {
+        onEdit(); // Swipe Right
+      } else {
+        onDelete(); // Swipe Left
+      }
+    }
+    setOffsetX(0);
+    touchStartX.current = null;
+  };
+
+  const handleClick = () => {
+      if (isSwiping.current) return;
+      // Bounce Hint
+      setOffsetX(40);
+      setTimeout(() => {
+          setOffsetX(0);
+          setTimeout(() => {
+              setOffsetX(-40);
+              setTimeout(() => {
+                  setOffsetX(0);
+              }, 250);
+          }, 250);
+      }, 250);
+  };
+
+  const bgStyle = offsetX > 0 ? 'bg-blue-600' : 'bg-rose-600'; 
+
+  const actionContent = offsetX > 0 ? (
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+         <span>Modifica</span>
+      </div>
+  ) : (
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <span>Elimina</span>
+         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+      </div>
+  );
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl mb-2 shadow-sm border border-slate-100 ${Math.abs(offsetX) > 20 ? bgStyle : 'bg-white'}`}>
+       {Math.abs(offsetX) > 20 && actionContent}
+       <div 
+         ref={itemRef}
+         className="bg-white rounded-2xl relative z-10 transition-transform duration-300 ease-out active:duration-0 cursor-pointer"
+         style={{ transform: `translateX(${offsetX}px)` }}
+         onTouchStart={handleTouchStart}
+         onTouchMove={handleTouchMove}
+         onTouchEnd={handleTouchEnd}
+         onClick={handleClick}
+       >
+         {children}
+       </div>
+    </div>
+  )
+}
 
 export const Investments: React.FC = () => {
   const { 
@@ -562,9 +651,9 @@ export const Investments: React.FC = () => {
         )}
 
         {/* TABELLA STORICO */}
-        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 md:px-8 py-5 bg-[#fcfdfe] border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Storico Dati</h3>
+        <div className="bg-transparent md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 overflow-visible md:overflow-hidden relative z-10">
+          <div className="px-2 md:px-8 py-3 md:py-5 md:bg-[#fcfdfe] md:border-b md:border-slate-100">
+            <h3 className="text-xs md:text-sm font-bold text-slate-500 md:text-slate-800 uppercase tracking-wide pl-2 md:pl-0 mb-2 md:mb-0">Storico Dati</h3>
           </div>
           
           {/* VISTA DESKTOP */}
@@ -624,49 +713,42 @@ export const Investments: React.FC = () => {
             </table>
           </div>
 
-          {/* VISTA MOBILE */}
-          <div className="md:hidden">
+          {/* VISTA MOBILE: LISTA SWIPEABLE COMPATTA */}
+          <div className="md:hidden space-y-2 p-0 pb-3">
              {processedTrends.map((trend) => (
-                <div key={trend.id} className="p-5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                   <div className="flex justify-between items-start mb-2">
-                       <span className="text-sm font-bold text-slate-700 capitalize">
-                           {new Date(trend.value_on).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
-                       </span>
-                       <span className="text-base font-black text-slate-900">
-                           {(trend.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                       </span>
-                   </div>
-                   
-                   <div className="grid grid-cols-2 gap-2 text-xs">
-                       <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 font-bold uppercase">Cashflow Mese</span>
-                           <span className={`font-mono font-medium ${trend.cash_flow > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
-                               {trend.cash_flow > 0 ? '+' : ''}{(trend.cash_flow ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
-                           </span>
-                       </div>
-                       <div className="flex flex-col text-right">
-                           <span className="text-[10px] text-slate-400 font-bold uppercase">ROI Totale</span>
-                           <span className={`font-black ${trend.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                               {trend.totalRoi > 0 ? '+' : ''}{(trend.totalRoi ?? 0).toFixed(2)}%
-                           </span>
-                       </div>
-                   </div>
-
-                   <div className="flex items-center justify-end space-x-4 mt-3 pt-3 border-t border-slate-50/50">
-                       <button 
-                          onClick={() => setTrendModal({ open: true, initialData: trend })}
-                          className="text-xs font-bold text-blue-600 uppercase tracking-wide px-2 py-1 bg-blue-50 rounded"
-                        >
-                          Modifica
-                        </button>
-                       <button 
-                          onClick={() => setDeleteDialog({ open: true, item: selectedInvestment, isTrend: true, trendId: trend.id })}
-                          className="text-xs font-bold text-rose-400 uppercase tracking-wide"
-                        >
-                          Elimina
-                        </button>
-                   </div>
-                </div>
+                <SwipeableTrendItem
+                    key={trend.id}
+                    onEdit={() => setTrendModal({ open: true, initialData: trend })}
+                    onDelete={() => setDeleteDialog({ open: true, item: selectedInvestment, isTrend: true, trendId: trend.id })}
+                >
+                    <div className="p-3.5 active:scale-[0.98] transition-transform">
+                        {/* Upper Row: Date Left, Value Right */}
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-600 capitalize">
+                                {new Date(trend.value_on).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                            </span>
+                            <span className="text-sm font-black text-slate-900">
+                                {(trend.value_original ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                        
+                        {/* Lower Row: Cashflow Left, ROI Right */}
+                        <div className="flex justify-between items-center text-[10px]">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-300 uppercase">Cashflow</span>
+                                <span className={`font-mono font-bold ${trend.cash_flow > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                    {trend.cash_flow > 0 ? '+' : ''}{(trend.cash_flow ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-300 uppercase">ROI</span>
+                                <span className={`font-black ${trend.totalRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {trend.totalRoi > 0 ? '+' : ''}{(trend.totalRoi ?? 0).toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </SwipeableTrendItem>
              ))}
           </div>
 
@@ -806,24 +888,39 @@ export const Investments: React.FC = () => {
                         </table>
                     </div>
 
-                    {/* Mobile List */}
-                    <div className="md:hidden divide-y divide-slate-50">
+                    {/* Mobile List - Compact & Cleaner */}
+                    <div className="md:hidden p-3 space-y-2">
                         {retirement.map(inv => {
                             const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
                             return (
-                                <div key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="p-5 active:bg-slate-50 transition-colors flex justify-between items-center">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 text-sm mb-1">{inv.name}</h4>
-                                        <div className="text-[10px] text-slate-400 font-medium uppercase">
-                                            Investito: {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })} {inv.currency}
+                                <div 
+                                    key={inv.id} 
+                                    onClick={() => setSelectedInvestmentId(inv.id)} 
+                                    className="bg-white border border-slate-100 rounded-[1.2rem] shadow-sm p-4 active:scale-[0.98] transition-transform"
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-900">{inv.name}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase bg-slate-50 px-1 py-0.5 rounded border border-slate-100">{inv.currency}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-lg font-black text-slate-900">
+                                                {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="font-black text-slate-900 text-lg">
-                                            {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-medium">{inv.currency}</span>
+                                    <div className="pt-2 border-t border-slate-50 grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase block">Investito</span>
+                                            <span className="text-xs font-mono font-medium text-slate-600">
+                                                {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
-                                        <div className={`text-[10px] font-bold mt-0.5 ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}% ROI
+                                        <div className="text-right">
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase block">ROI</span>
+                                            <span className={`text-xs font-black ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -921,24 +1018,39 @@ export const Investments: React.FC = () => {
                         </table>
                     </div>
 
-                    {/* Mobile List */}
-                    <div className="md:hidden divide-y divide-slate-50">
+                    {/* Mobile List - Compact */}
+                    <div className="md:hidden p-3 space-y-2">
                         {personal.map(inv => {
                             const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
                             return (
-                                <div key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="p-5 active:bg-slate-50 transition-colors flex justify-between items-center">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 text-sm mb-1">{inv.name}</h4>
-                                        <div className="text-[10px] text-slate-400 font-medium uppercase">
-                                            Investito: {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })} {inv.currency}
+                                <div 
+                                    key={inv.id} 
+                                    onClick={() => setSelectedInvestmentId(inv.id)} 
+                                    className="bg-white border border-slate-100 rounded-[1.2rem] shadow-sm p-4 active:scale-[0.98] transition-transform"
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-900">{inv.name}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-1 py-0.5 rounded border border-slate-100">{inv.currency}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-lg font-black text-slate-900">
+                                                {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="font-black text-slate-900 text-lg">
-                                            {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-medium">{inv.currency}</span>
+                                    <div className="pt-2 border-t border-slate-50 grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase block">Investito</span>
+                                            <span className="text-xs font-mono font-medium text-slate-600">
+                                                {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
-                                        <div className={`text-[10px] font-bold mt-0.5 ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}% ROI
+                                        <div className="text-right">
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase block">ROI</span>
+                                            <span className={`text-xs font-black ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                                            </span>
                                         </div>
                                     </div>
                                 </div>

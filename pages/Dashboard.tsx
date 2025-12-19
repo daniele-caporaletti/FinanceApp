@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
@@ -65,6 +64,12 @@ export const Dashboard: React.FC = () => {
         category: parent ? parent.name : cat.name, 
         subcategory: parent ? cat.name : '-' 
     };
+  };
+
+  // Helper per account currency
+  const getAccountCurrency = (accountId: string) => {
+      const acc = accounts.find(a => a.id === accountId);
+      return acc ? acc.currency_code : 'CHF';
   };
 
   // --- CALCOLI WIDGET ---
@@ -211,7 +216,7 @@ export const Dashboard: React.FC = () => {
             );
         })
         .sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime())
-        .slice(0, 9); // Max 9 items
+        .slice(0, 15); // Max 15 items
   }, [transactions, selectedYear, selectedMonth]);
 
   // 6. Lista Essenziali & Giroconti (Filtered by selectedMonth)
@@ -316,55 +321,58 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* TOP CARDS SECTION (3 COLUMNS) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+          {/* TOP CARDS SECTION (3-COLUMN GRID ON MOBILE) */}
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4 -mx-2 px-2 md:mx-0 md:px-0">
               
-              {/* CARD 1: USCITE VARIABILI (MESE CORRENTE REALE) */}
+              {/* CARD 1: USCITE VARIABILI (Compact) */}
               <div 
                 onClick={() => navigateTo(AppSection.Analisi)}
-                className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
+                className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-center h-auto min-h-[90px]"
               >
-                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>
-                 <div className="relative z-10">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Uscite Variabili (Mese)
-                    </span>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight">CHF {currentMonthRealVariables.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                 <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mb-1 truncate w-full">Uscite Variabili</span>
+                    <div className="text-sm md:text-2xl font-black text-indigo-600 md:text-slate-900 tracking-tight truncate w-full">
+                        {currentMonthRealVariables.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-[10px] md:text-base font-bold text-slate-400">CHF</span>
+                    </div>
                  </div>
               </div>
 
-              {/* CARD 2: LIQUIDITA' */}
+              {/* CARD 2: LIQUIDITA' (Compact) */}
               <div 
                 onClick={() => navigateTo(AppSection.Conti)}
-                className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
+                className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-center h-auto min-h-[90px]"
               >
-                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg></div>
-                 <div className="relative z-10">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> Liquidità (Conti)
-                    </span>
-                    <div className="text-2xl font-black text-slate-900 tracking-tight">CHF {wealthData.liquidity.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                 <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mb-1 truncate w-full">Liquidità</span>
+                    <div className="text-sm md:text-2xl font-black text-blue-600 md:text-slate-900 tracking-tight truncate w-full">
+                        {wealthData.liquidity.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-[10px] md:text-base font-bold text-slate-400">CHF</span>
+                    </div>
                  </div>
               </div>
 
-              {/* CARD 3: INVESTIMENTI (Ripristinata) */}
+              {/* CARD 3: INVESTIMENTI (Compact) */}
               <div 
                 onClick={() => navigateTo(AppSection.Investimenti)}
-                className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden h-[110px] flex flex-col justify-center"
+                className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-center h-auto min-h-[90px] relative"
               >
-                 {/* Background Icon */}
-                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></div>
-                 
-                 <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Investimenti
-                        </span>
-                        {/* Blur Toggle Button Inline */}
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); setIsInvestmentsHidden(!isInvestmentsHidden); }}
+                    className="absolute top-1 right-1 p-1.5 text-slate-300 hover:text-slate-500 z-20 md:hidden"
+                 >
+                    {isInvestmentsHidden ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    )}
+                 </button>
+
+                 <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left">
+                    <div className="flex items-center gap-1 mb-1 justify-center md:justify-start w-full">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">Investimenti</span>
+                        {/* Desktop Blur Button */}
                         <button 
                             onClick={(e) => { e.stopPropagation(); setIsInvestmentsHidden(!isInvestmentsHidden); }}
-                            className="p-1 rounded-full hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors"
-                            title={isInvestmentsHidden ? "Mostra" : "Nascondi"}
+                            className="hidden md:block p-0.5 rounded-full hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors"
                         >
                             {isInvestmentsHidden ? (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
@@ -373,8 +381,8 @@ export const Dashboard: React.FC = () => {
                             )}
                         </button>
                     </div>
-                    <div className={`text-2xl font-black text-slate-900 tracking-tight transition-all duration-300 ${isInvestmentsHidden ? 'blur-md select-none opacity-50' : ''}`}>
-                        CHF {wealthData.investments.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    <div className={`text-sm md:text-2xl font-black text-emerald-600 md:text-slate-900 tracking-tight transition-all duration-300 truncate w-full ${isInvestmentsHidden ? 'blur-sm select-none opacity-50' : ''}`}>
+                        {wealthData.investments.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-[10px] md:text-base font-bold text-slate-400">CHF</span>
                     </div>
                  </div>
               </div>
@@ -413,7 +421,7 @@ export const Dashboard: React.FC = () => {
                   <div className="flex flex-col items-end">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Saldo Personale</span>
                       <span className={`text-base font-black ${currentMonthStats.netBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {currentMonthStats.netBalance.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                          {currentMonthStats.netBalance.toLocaleString('it-IT', { minimumFractionDigits: 0 })} <span className="text-[10px] text-slate-400">CHF</span>
                       </span>
                   </div>
               </div>
@@ -442,41 +450,34 @@ export const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* Widget: Spese Essenziali & Giroconti (Split) - REDESIGNED */}
-          <div onClick={() => navigateTo(AppSection.SpeseEssenziali)} className="bg-white p-0 rounded-[1.5rem] border border-slate-200 shadow-sm cursor-pointer hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between h-[110px] md:h-auto">
-              {/* Spese */}
-              <div className="p-4 flex-1 flex flex-col justify-center relative">
-                  <div className="flex justify-between items-end relative z-10">
-                      <div>
-                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">Essenziali (Spese)</h3>
-                          <div className="flex items-baseline gap-1">
-                              <span className="text-2xl font-black text-slate-900">{essentialsBreakdown.expenses.paid}</span>
-                              <span className="text-xs font-medium text-slate-400">/ {essentialsBreakdown.expenses.total}</span>
-                          </div>
-                      </div>
-                      <div className="text-right">
-                          <span className="text-[9px] text-slate-400 uppercase font-bold block">Rimanente</span>
-                          <span className="text-sm font-bold text-rose-500">{essentialsBreakdown.expenses.remainingAmount > 0 ? `~ ${essentialsBreakdown.expenses.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'}</span>
-                      </div>
+          {/* Widget: Spese Essenziali & Giroconti (Split LEFT/RIGHT) - REDESIGNED */}
+          <div 
+            onClick={() => navigateTo(AppSection.SpeseEssenziali)} 
+            className="bg-white p-0 rounded-[1.5rem] border border-slate-200 shadow-sm cursor-pointer hover:shadow-md transition-all relative overflow-hidden flex flex-row items-stretch min-h-[100px]"
+          >
+              {/* Left Side: Spese */}
+              <div className="w-1/2 p-4 flex flex-col justify-center border-r border-slate-100 relative">
+                  <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1">Essenziali</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                      <span className="text-xl font-black text-slate-900">{essentialsBreakdown.expenses.paid}</span>
+                      <span className="text-[10px] font-medium text-slate-400">/ {essentialsBreakdown.expenses.total}</span>
+                  </div>
+                  <div className="mt-auto">
+                      <span className="text-[8px] text-slate-300 uppercase font-bold block">Rimanente</span>
+                      <span className="text-xs font-bold text-rose-500 truncate block">{essentialsBreakdown.expenses.remainingAmount > 0 ? `~ ${essentialsBreakdown.expenses.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'} <span className="text-[9px] text-slate-400 font-normal">CHF</span></span>
                   </div>
               </div>
 
-              <div className="w-full h-px bg-slate-100"></div>
-
-              {/* Giroconti */}
-              <div className="p-4 flex-1 flex flex-col justify-center relative bg-slate-50/50">
-                  <div className="flex justify-between items-end relative z-10">
-                      <div>
-                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">Giroconti</h3>
-                          <div className="flex items-baseline gap-1">
-                              <span className="text-2xl font-black text-slate-900">{essentialsBreakdown.transfers.paid}</span>
-                              <span className="text-xs font-medium text-slate-400">/ {essentialsBreakdown.transfers.total}</span>
-                          </div>
-                      </div>
-                      <div className="text-right">
-                          <span className="text-[9px] text-slate-400 uppercase font-bold block">Da spostare</span>
-                          <span className="text-sm font-bold text-blue-500">{essentialsBreakdown.transfers.remainingAmount > 0 ? `~ ${essentialsBreakdown.transfers.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'}</span>
-                      </div>
+              {/* Right Side: Giroconti */}
+              <div className="w-1/2 p-4 flex flex-col justify-center relative bg-slate-50/30">
+                  <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1">Giroconti</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                      <span className="text-xl font-black text-slate-900">{essentialsBreakdown.transfers.paid}</span>
+                      <span className="text-[10px] font-medium text-slate-400">/ {essentialsBreakdown.transfers.total}</span>
+                  </div>
+                  <div className="mt-auto">
+                      <span className="text-[8px] text-slate-300 uppercase font-bold block">Da Spostare</span>
+                      <span className="text-xs font-bold text-blue-500 truncate block">{essentialsBreakdown.transfers.remainingAmount > 0 ? `~ ${essentialsBreakdown.transfers.remainingAmount.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '0'} <span className="text-[9px] text-slate-400 font-normal">CHF</span></span>
                   </div>
               </div>
           </div>
@@ -486,8 +487,8 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           
           {/* Lista Recenti / Essenziali Preview */}
-          <div className="xl:col-span-1 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="px-6 py-5 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center">
+          <div className="xl:col-span-1 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px] xl:h-0 xl:min-h-full">
+              <div className="px-6 py-5 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
                   <div className="flex space-x-4">
                       <button 
                         onClick={() => setListTab('recent')}
@@ -506,13 +507,14 @@ export const Dashboard: React.FC = () => {
                   <button onClick={() => navigateTo(listTab === 'recent' ? AppSection.Movimenti : AppSection.SpeseEssenziali)} className="text-xs font-bold text-blue-600 hover:underline">Vedi Tutti</button>
               </div>
               
-              <div className="p-2">
+              <div className="p-2 flex-1 overflow-y-auto no-scrollbar relative">
                   
                   {/* TAB: Recenti Variabili */}
                   {listTab === 'recent' && (
                       <>
                         {recentTransactions.map(tx => {
                             const { category, subcategory } = getCategoryInfo(tx.category_id);
+                            const currency = getAccountCurrency(tx.account_id);
                             return (
                                 <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3">
                                     <div className="flex flex-col min-w-0">
@@ -527,7 +529,7 @@ export const Dashboard: React.FC = () => {
                                     </div>
                                     <div className="flex flex-col items-end flex-shrink-0">
                                         <span className={`text-xs font-black ${(tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                            {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-[9px] font-bold text-slate-300">{currency}</span>
                                         </span>
                                         <span className="text-[9px] text-slate-300 font-bold">{new Date(tx.occurred_on).toLocaleDateString('it-IT', {day: 'numeric', month: 'short'})}</span>
                                     </div>
@@ -542,18 +544,18 @@ export const Dashboard: React.FC = () => {
 
                   {/* TAB: Essenziali (Spese & Giroconti) */}
                   {listTab === 'essential' && (
-                      <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                      <div>
                         {/* Spese */}
                         {groupedEssentials.expenses.length > 0 && (
                             <>
-                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 backdrop-blur-sm">Spese Fisse</div>
+                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 border-b border-slate-100/50">Spese Fisse</div>
                                 {groupedEssentials.expenses.map(rec => (
                                     <div 
                                         key={rec.id} 
                                         onClick={() => navigateTo(AppSection.SpeseEssenziali)}
-                                        className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3 cursor-pointer group"
+                                        className="flex items-center justify-between py-2 px-1 hover:bg-slate-50 rounded-xl transition-colors gap-2 cursor-pointer group"
                                     >
-                                        <div className="flex items-center gap-3 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0">
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${rec.isPaid ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-300 group-hover:border-rose-200'}`}>
                                                 {rec.isPaid ? (
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
@@ -584,14 +586,14 @@ export const Dashboard: React.FC = () => {
                         {/* Giroconti Separator */}
                         {groupedEssentials.transfers.length > 0 && (
                             <>
-                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 backdrop-blur-sm mt-2 border-t border-slate-100">Giroconti</div>
+                                <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 border-b border-slate-100/50 mt-2">Giroconti</div>
                                 {groupedEssentials.transfers.map(rec => (
                                     <div 
                                         key={rec.id} 
                                         onClick={() => navigateTo(AppSection.SpeseEssenziali)}
-                                        className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors gap-3 cursor-pointer group"
+                                        className="flex items-center justify-between py-2 px-1 hover:bg-slate-50 rounded-xl transition-colors gap-2 cursor-pointer group"
                                     >
-                                        <div className="flex items-center gap-3 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0">
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-colors ${rec.isPaid ? 'bg-blue-100 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-300 group-hover:border-blue-200'}`}>
                                                 {rec.isPaid ? (
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
@@ -636,14 +638,14 @@ export const Dashboard: React.FC = () => {
              </div>
              
              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full border-collapse min-w-[600px] table-fixed text-left">
+                <table className="w-full border-collapse min-w-[350px] table-fixed text-left">
                    <thead>
                       <tr className="border-b border-slate-100 bg-slate-50/50">
-                         <th className="w-[80px] px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Mese</th>
-                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Entrate</th>
-                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Uscite <span className="text-[8px] font-medium text-slate-400 normal-case block">(Var / Fisse)</span></th>
-                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Lavoro <span className="text-[8px] font-medium text-slate-400 normal-case block">(Entrate / Uscite)</span></th>
-                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Netto</th>
+                         <th className="w-[50px] px-2 py-2 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest">Mese</th>
+                         <th className="px-1 py-2 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Entrate</th>
+                         <th className="px-1 py-2 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Uscite <span className="text-[8px] md:text-[10px] font-medium text-slate-400 normal-case block">(Var/Fix)</span></th>
+                         <th className="px-1 py-2 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Lavoro <span className="text-[8px] md:text-[10px] font-medium text-slate-400 normal-case block">(In/Out)</span></th>
+                         <th className="px-1 py-2 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Netto</th>
                       </tr>
                    </thead>
                    <tbody>
@@ -656,31 +658,31 @@ export const Dashboard: React.FC = () => {
 
                          return (
                             <tr key={idx} className={`border-b border-slate-50 last:border-0 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>
-                               <td className="px-4 py-2 align-middle">
-                                  <span className={`text-xs font-bold ${isSelected ? 'text-blue-600' : 'text-slate-700'}`}>{monthNames[idx].substring(0,3)}</span>
+                               <td className="px-2 py-2 align-middle">
+                                  <span className={`text-xs md:text-sm font-bold ${isSelected ? 'text-blue-600' : 'text-slate-700'}`}>{monthNames[idx].substring(0,3)}</span>
                                </td>
                                
                                {/* Entrate */}
-                               <td onClick={() => goToTransactions(idx, 'income')} className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-emerald-50/50 transition-colors">
-                                  <span className={`text-xs font-mono font-medium ${data.income !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                               <td onClick={() => goToTransactions(idx, 'income')} className="px-1 py-2 text-center align-middle cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                                  <span className={`text-xs md:text-sm font-mono font-medium ${data.income !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                                     {data.income !== 0 ? data.income.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                   </span>
                                </td>
 
                                {/* Uscite (Variabili + Fisse) */}
-                               <td className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-slate-50 transition-colors">
+                               <td className="px-1 py-2 text-center align-middle cursor-pointer hover:bg-slate-50 transition-colors">
                                   <div className="flex flex-col gap-0.5 items-center justify-center">
                                       {/* Variabili (Indaco) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'variable')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.variable !== 0 ? 'text-indigo-500' : 'text-slate-300'}`}
+                                        className={`text-[10px] md:text-xs font-mono font-bold leading-none hover:underline ${data.variable !== 0 ? 'text-indigo-500' : 'text-slate-300'}`}
                                       >
                                         {data.variable !== 0 ? data.variable.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
                                       {/* Fisse (Rosa) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'fixed')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.fixed !== 0 ? 'text-rose-500' : 'text-slate-300'}`}
+                                        className={`text-[10px] md:text-xs font-mono font-bold leading-none hover:underline ${data.fixed !== 0 ? 'text-rose-500' : 'text-slate-300'}`}
                                       >
                                         {data.fixed !== 0 ? data.fixed.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
@@ -688,19 +690,19 @@ export const Dashboard: React.FC = () => {
                                </td>
 
                                {/* Lavoro (Entrate + Uscite) */}
-                               <td className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-amber-50/50 transition-colors">
+                               <td className="px-1 py-2 text-center align-middle cursor-pointer hover:bg-amber-50/50 transition-colors">
                                   <div className="flex flex-col gap-0.5 items-center justify-center">
                                       {/* Work Income (Positive - Lighter Yellow) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'work_income')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workIncome !== 0 ? 'text-amber-500' : 'text-slate-300'}`}
+                                        className={`text-[10px] md:text-xs font-mono font-bold leading-none hover:underline ${data.workIncome !== 0 ? 'text-amber-500' : 'text-slate-300'}`}
                                       >
                                         {data.workIncome !== 0 ? data.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
                                       {/* Work Expense (Negative - Reddish Yellow) */}
                                       <span 
                                         onClick={() => goToTransactions(idx, 'work_expense')}
-                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workExpense !== 0 ? 'text-orange-600' : 'text-slate-300'}`}
+                                        className={`text-[10px] md:text-xs font-mono font-bold leading-none hover:underline ${data.workExpense !== 0 ? 'text-orange-600' : 'text-slate-300'}`}
                                       >
                                         {data.workExpense !== 0 ? data.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                       </span>
@@ -708,8 +710,8 @@ export const Dashboard: React.FC = () => {
                                </td>
 
                                {/* Netto */}
-                               <td className="px-2 py-2 text-center align-middle">
-                                   <span className={`text-xs font-mono font-bold ${rowTotal > 0 ? 'text-emerald-600' : rowTotal < 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                               <td className="px-1 py-2 text-center align-middle">
+                                   <span className={`text-xs md:text-sm font-mono font-bold ${rowTotal > 0 ? 'text-emerald-600' : rowTotal < 0 ? 'text-rose-600' : 'text-slate-300'}`}>
                                       {rowTotal !== 0 ? rowTotal.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
                                    </span>
                                </td>
@@ -719,21 +721,21 @@ export const Dashboard: React.FC = () => {
                    </tbody>
                    <tfoot className="bg-slate-50/50 border-t border-slate-100">
                       <tr>
-                         <td className="px-4 py-2 text-[9px] font-black text-slate-400 uppercase align-middle">TOT</td>
-                         <td onClick={() => goToTransactions(-1, 'income')} className="px-2 py-2 text-center font-mono text-xs font-bold text-emerald-600 cursor-pointer hover:bg-slate-100">{matrixTotals.income.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
-                         <td className="px-2 py-2 text-center align-middle">
+                         <td className="px-2 py-2 text-[10px] md:text-xs font-black text-slate-400 uppercase align-middle">TOT</td>
+                         <td onClick={() => goToTransactions(-1, 'income')} className="px-1 py-2 text-center font-mono text-xs md:text-sm font-bold text-emerald-600 cursor-pointer hover:bg-slate-100">{matrixTotals.income.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
+                         <td className="px-1 py-2 text-center align-middle">
                              <div className="flex flex-col gap-0.5 items-center justify-center">
-                                <span onClick={() => goToTransactions(-1, 'variable')} className="text-[10px] font-mono font-bold text-indigo-500 leading-none cursor-pointer hover:underline">{matrixTotals.variable.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
-                                <span onClick={() => goToTransactions(-1, 'fixed')} className="text-[10px] font-mono font-bold text-rose-500 leading-none cursor-pointer hover:underline">{matrixTotals.fixed.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'variable')} className="text-[10px] md:text-xs font-mono font-bold text-indigo-500 leading-none cursor-pointer hover:underline">{matrixTotals.variable.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'fixed')} className="text-[10px] md:text-xs font-mono font-bold text-rose-500 leading-none cursor-pointer hover:underline">{matrixTotals.fixed.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                              </div>
                          </td>
-                         <td className="px-2 py-2 text-center align-middle">
+                         <td className="px-1 py-2 text-center align-middle">
                              <div className="flex flex-col gap-0.5 items-center justify-center">
-                                <span onClick={() => goToTransactions(-1, 'work_income')} className="text-[10px] font-mono font-bold text-amber-500 leading-none cursor-pointer hover:underline">{matrixTotals.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
-                                <span onClick={() => goToTransactions(-1, 'work_expense')} className="text-[10px] font-mono font-bold text-orange-600 leading-none cursor-pointer hover:underline">{matrixTotals.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'work_income')} className="text-[10px] md:text-xs font-mono font-bold text-amber-500 leading-none cursor-pointer hover:underline">{matrixTotals.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'work_expense')} className="text-[10px] md:text-xs font-mono font-bold text-orange-600 leading-none cursor-pointer hover:underline">{matrixTotals.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                              </div>
                          </td>
-                         <td className={`px-2 py-2 text-center font-mono text-xs font-black align-middle ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
+                         <td className={`px-1 py-2 text-center font-mono text-xs md:text-sm font-black align-middle ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
                       </tr>
                    </tfoot>
                 </table>

@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Transaction } from '../types';
@@ -474,16 +473,20 @@ export const Tags: React.FC = () => {
                 {/* Mobile Transaction Cards */}
                 <div className="md:hidden p-4 space-y-3">
                     {drillDownData?.txs.map(tx => {
+                        const { main, sub } = getCategoryInfo(tx.category_id);
                         const { name: accountName, currency } = getAccountInfo(tx.account_id);
                         const isTransfer = tx.kind === 'transfer';
                         const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
 
                         return (
-                            <div key={tx.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                            <div key={tx.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.98] transition-transform">
                                  <div className="flex justify-between items-start mb-2">
                                     <div className="flex flex-col">
                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{new Date(tx.occurred_on).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}</span>
-                                       <span className="text-sm font-bold text-slate-800 mt-0.5">{tx.description || '-'}</span>
+                                       <div className="flex items-center space-x-1.5 mt-0.5">
+                                            <span className="text-sm font-bold text-slate-800">{main}</span>
+                                            {sub !== '-' && <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{sub}</span>}
+                                       </div>
                                     </div>
                                     <div className="flex flex-col items-end">
                                        <span className={`text-base font-black ${amountColorClass}`}>
@@ -492,9 +495,15 @@ export const Tags: React.FC = () => {
                                        </span>
                                     </div>
                                  </div>
-                                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50">
-                                     <span className="px-2 py-0.5 rounded-[6px] bg-slate-50 border border-slate-100 text-[9px] font-bold text-slate-500 uppercase">{accountName}</span>
-                                     {getKindBadge(tx.kind)}
+                                 <div className="flex justify-between items-end mt-3 pt-3 border-t border-slate-50">
+                                    <div className="flex flex-col gap-1 w-full">
+                                        {tx.description && <span className="text-xs text-slate-500 truncate">{tx.description}</span>}
+                                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                            <span className="px-2 py-0.5 rounded-[6px] bg-slate-50 border border-slate-100 text-[9px] font-bold text-slate-500 uppercase">{accountName}</span>
+                                            {getKindBadge(tx.kind)}
+                                            {tx.tag && <span className="px-1.5 py-0.5 border border-slate-200 rounded text-[9px] font-bold uppercase text-slate-500 bg-white">#{tx.tag}</span>}
+                                        </div>
+                                    </div>
                                  </div>
                             </div>
                         );

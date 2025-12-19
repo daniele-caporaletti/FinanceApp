@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Account } from '../types';
 import { FullScreenModal } from '../components/FullScreenModal';
@@ -89,7 +88,7 @@ const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onSave, in
 
           <div 
             onClick={() => setFormData(f => ({ ...f, exclude_from_overview: !f.exclude_from_overview }))}
-            className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-all border border-slate-100"
+            className="flex items-center justify-center p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-all border border-slate-100 gap-3"
           >
             <span className="text-xs font-bold text-slate-700">Mostra in Overview</span>
             <div className={`w-10 h-5 rounded-full relative transition-all ${!formData.exclude_from_overview ? 'bg-blue-600' : 'bg-slate-300'}`}>
@@ -109,6 +108,101 @@ const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onSave, in
     </div>
   );
 };
+
+// --- MOBILE SWIPEABLE ITEM FOR ACCOUNTS ---
+interface SwipeableAccountProps { 
+  children: React.ReactNode; 
+  onEdit: () => void; 
+  onToggle: () => void;
+  isHidden: boolean; 
+}
+
+const SwipeableAccountItem: React.FC<SwipeableAccountProps> = ({ children, onEdit, onToggle, isHidden }) => {
+  const [offsetX, setOffsetX] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const isSwiping = useRef(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    isSwiping.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStartX.current;
+    
+    if (Math.abs(diff) > 5) {
+        isSwiping.current = true;
+        if (diff > -150 && diff < 150) {
+            setOffsetX(diff);
+        }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (Math.abs(offsetX) > 80) {
+      if (offsetX > 0) {
+        onEdit(); // Swipe Right
+      } else {
+        onToggle(); // Swipe Left
+      }
+    }
+    setOffsetX(0);
+    touchStartX.current = null;
+  };
+
+  const handleClick = () => {
+      if (isSwiping.current) return;
+      // Bounce Hint: Right (Edit) -> Left (Toggle) -> Center
+      setOffsetX(40);
+      setTimeout(() => {
+          setOffsetX(0);
+          setTimeout(() => {
+              setOffsetX(-40);
+              setTimeout(() => {
+                  setOffsetX(0);
+              }, 250);
+          }, 250);
+      }, 250);
+  };
+
+  const bgStyle = offsetX > 0 ? 'bg-blue-600' : 'bg-slate-700'; // Right: Blue, Left: Dark Slate
+
+  const actionContent = offsetX > 0 ? (
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+         <span>Modifica</span>
+      </div>
+  ) : (
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <span>{isHidden ? 'Mostra' : 'Nascondi'}</span>
+         {isHidden ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+         ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+         )}
+      </div>
+  );
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl mb-3 shadow-sm border border-slate-100 ${Math.abs(offsetX) > 20 ? bgStyle : 'bg-white'}`}>
+       {Math.abs(offsetX) > 20 && actionContent}
+       <div 
+         ref={itemRef}
+         className="bg-white rounded-2xl relative z-10 transition-transform duration-300 ease-out active:duration-0 cursor-pointer"
+         style={{ transform: `translateX(${offsetX}px)` }}
+         onTouchStart={handleTouchStart}
+         onTouchMove={handleTouchMove}
+         onTouchEnd={handleTouchEnd}
+         onClick={handleClick}
+       >
+         {children}
+       </div>
+    </div>
+  )
+}
 
 export const Accounts: React.FC = () => {
   const { accounts, transactions, updateAccount, addAccount } = useFinance();
@@ -283,51 +377,45 @@ export const Accounts: React.FC = () => {
         </div>
       </div>
 
-      {/* VISTA MOBILE: CARDS */}
-      <div className="md:hidden space-y-4">
+      {/* VISTA MOBILE: LISTA COMPATTA SWIPEABLE */}
+      <div className="md:hidden space-y-3 relative z-10">
         {displayedAccounts.map((account) => {
            const balance = calculateBalance(account.id);
            const isActive = account.status === 'active';
            const isExcluded = account.exclude_from_overview;
            
            return (
-             <div key={account.id} className="bg-white p-5 rounded-[1.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
-                <div className="flex justify-between items-start mb-4">
-                   <div>
-                      <h3 className="text-lg font-bold text-slate-900">{account.name}</h3>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-0.5 rounded">{account.currency_code} Account</span>
+             <SwipeableAccountItem
+                key={account.id}
+                onEdit={() => setModalState({ open: true, initialData: account })}
+                onToggle={() => updateAccount(account.id, { exclude_from_overview: !isExcluded })}
+                isHidden={isExcluded}
+             >
+                <div className="p-4 active:scale-[0.98] transition-transform flex items-center justify-between">
+                   {/* Left: Name & Badges */}
+                   <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                         <span className="text-sm font-bold text-slate-900">{account.name}</span>
+                         {isExcluded && <div className="w-1.5 h-1.5 rounded-full bg-slate-300" title="Nascosto in overview"></div>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{account.currency_code}</span>
+                         {!isActive && <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Inattivo</span>}
+                      </div>
                    </div>
-                   <div className={`px-2 py-1 rounded text-[9px] font-black uppercase ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                      {isActive ? 'Attivo' : 'Inattivo'}
-                   </div>
-                </div>
-                
-                <div className="mb-5">
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saldo Attuale</span>
-                   <div className={`text-2xl font-black ${balance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                      {balance.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-sm text-slate-300">{account.currency_code}</span>
-                   </div>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-                   <button 
-                     onClick={() => updateAccount(account.id, { exclude_from_overview: !isExcluded })}
-                     className="flex items-center space-x-2 text-xs font-bold text-slate-400 active:text-blue-600"
-                   >
-                      <div className={`w-2 h-2 rounded-full ${!isExcluded ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
-                      <span>{isExcluded ? 'Nascosto' : 'Visibile'}</span>
-                   </button>
-                   
-                   <button 
-                      onClick={() => setModalState({ open: true, initialData: account })}
-                      className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-blue-50 active:text-blue-600 transition-colors"
-                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                   </button>
+                   {/* Right: Balance */}
+                   <div className="flex flex-col items-end">
+                      <span className={`text-base font-black ${balance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                         {balance.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[9px] font-medium text-slate-400">Saldo Attuale</span>
+                   </div>
                 </div>
-             </div>
+             </SwipeableAccountItem>
            );
         })}
+        
         <button 
            onClick={() => setModalState({ open: true })}
            className="w-full py-4 border-2 border-dashed border-slate-200 rounded-[1.5rem] text-slate-400 font-bold text-sm hover:bg-slate-50 hover:border-blue-200 hover:text-blue-500 transition-all flex items-center justify-center space-x-2"
@@ -353,20 +441,20 @@ export const Accounts: React.FC = () => {
         <div className="space-y-6">
            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                  Qui puoi gestire i conti su cui vengono registrate le transazioni (es. Conto Corrente, Carta di Credito, Revolut).
+                  Gestisci i conti su cui vengono registrate le transazioni.
                </p>
            </div>
            
            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Note Importanti</h4>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Azioni Mobile</h4>
               <ul className="space-y-3">
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Patrimonio Attivo:</span> È la somma convertita in CHF dei saldi di tutti i conti <strong>attivi</strong>. I conti in valuta estera vengono convertiti al tasso attuale.</p>
+                 <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>destra</strong> per Modificare.</span>
                  </li>
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">In Overview:</span> L'opzione "Mostra in Overview" determina se il conto contribuisce al calcolo del "Patrimonio Spendibile" nella Dashboard principale. Utile per escludere conti deposito vincolati o carte prepagate temporanee.</p>
+                 <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>sinistra</strong> per Nascondere/Mostrare.</span>
                  </li>
               </ul>
            </div>

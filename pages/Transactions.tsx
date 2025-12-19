@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
 import { Transaction, Category, Account } from '../types';
@@ -109,23 +109,42 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const currency = selectedAccount?.currency_code || 'CHF';
       const date = formData.occurred_on || new Date().toISOString().split('T')[0];
       const originalAmount = formData.amount_original || 0;
-      let baseAmount = originalAmount;
+      let baseAmount = 0;
+      
+      // Valori finali per categoria e tag
+      let finalCategoryId = formData.category_id;
+      let finalTag = formData.tag;
 
-      if (currency !== 'CHF') {
-        const rate = await fetchExchangeRate(date, currency, 'CHF');
-        baseAmount = originalAmount * rate;
+      // MODIFICATO: Se è transfer, amount_base è sempre 0 e puliamo categoria/tag.
+      if (formData.kind === 'transfer') {
+          baseAmount = 0;
+          finalCategoryId = null;
+          finalTag = null;
+      } else {
+          if (currency === 'CHF') {
+              baseAmount = originalAmount;
+          } else {
+              const rate = await fetchExchangeRate(date, currency, 'CHF');
+              baseAmount = originalAmount * rate;
+          }
+          // Arrotondamento
+          baseAmount = Math.round(baseAmount * 100) / 100;
       }
 
-      // Arrotondamento a 2 cifre decimali
-      baseAmount = Math.round(baseAmount * 100) / 100;
-
-      await onSave({ ...formData, amount_original: originalAmount, amount_base: baseAmount });
+      await onSave({ 
+          ...formData, 
+          amount_original: originalAmount, 
+          amount_base: baseAmount,
+          category_id: finalCategoryId,
+          tag: finalTag
+      });
       onClose();
     } catch (err) { alert("Errore durante il salvataggio."); } finally { setLoading(false); }
   };
 
   const selectedAccount = accounts.find(a => a.id === formData.account_id);
   const currencyLabel = selectedAccount?.currency_code || 'CHF';
+  const isTransfer = formData.kind === 'transfer';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
@@ -169,11 +188,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
-          </div>
-          <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tag</label><input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. vacanze..." value={formData.tag || ''} onChange={e => setFormData(f => ({ ...f, tag: e.target.value }))} /></div>
+          
+          {!isTransfer && (
+            <div className="grid grid-cols-2 gap-6">
+               <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
+               <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
+            </div>
+          )}
+
+          {!isTransfer && (
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tag</label><input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. vacanze..." value={formData.tag || ''} onChange={e => setFormData(f => ({ ...f, tag: e.target.value }))} /></div>
+          )}
+
           <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Descrizione</label><textarea rows={2} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 resize-none" placeholder="..." value={formData.description || ''} onChange={e => setFormData(f => ({ ...f, description: e.target.value }))} /></div>
           <button type="submit" disabled={loading} className={`w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : submitLabel}</button>
         </form>
@@ -182,10 +208,110 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   );
 };
 
+// --- MOBILE SWIPEABLE ITEM ---
+interface SwipeableItemProps { 
+  children: React.ReactNode; 
+  onEdit: () => void; 
+  onDelete: () => void; 
+}
+
+const SwipeableTransactionItem: React.FC<SwipeableItemProps> = ({ children, onEdit, onDelete }) => {
+  const [offsetX, setOffsetX] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const isSwiping = useRef(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    isSwiping.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStartX.current;
+    
+    // Only process horizontal swipe if significant
+    if (Math.abs(diff) > 5) {
+        isSwiping.current = true;
+        // Limit drag (max 150px)
+        if (diff > -150 && diff < 150) {
+            setOffsetX(diff);
+        }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (Math.abs(offsetX) > 80) { // Threshold 80px
+      if (offsetX > 0) {
+        // Swipe Right -> Edit
+        onEdit();
+      } else {
+        // Swipe Left -> Delete
+        onDelete();
+      }
+    }
+    // Reset animation
+    setOffsetX(0);
+    touchStartX.current = null;
+  };
+
+  const handleClick = () => {
+      // If it was a swipe interaction, ignore click
+      if (isSwiping.current) return;
+
+      // Bounce Animation Sequence to hint actions
+      // 1. Right (Blue/Edit)
+      setOffsetX(40);
+      setTimeout(() => {
+          setOffsetX(0);
+          setTimeout(() => {
+              // 2. Left (Red/Delete)
+              setOffsetX(-40);
+              setTimeout(() => {
+                  setOffsetX(0);
+              }, 250);
+          }, 250);
+      }, 250);
+  };
+
+  // Sfondo: Blu (Destra/Edit) se offset > 0, Rosso (Sinistra/Delete) se offset < 0
+  const bgStyle = offsetX > 0 ? 'bg-blue-600' : 'bg-rose-600';
+  
+  // Icona che appare durante lo swipe
+  const actionContent = offsetX > 0 ? (
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+         <span>Modifica</span>
+      </div>
+  ) : (
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 text-white flex items-center gap-1 font-bold text-xs uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+         <span>Elimina</span>
+         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+      </div>
+  );
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl mb-3 shadow-sm border border-slate-100 ${Math.abs(offsetX) > 20 ? bgStyle : 'bg-white'}`}>
+       {Math.abs(offsetX) > 20 && actionContent}
+       <div 
+         ref={itemRef}
+         className="bg-white rounded-2xl relative z-10 transition-transform duration-300 ease-out active:duration-0 cursor-pointer"
+         style={{ transform: `translateX(${offsetX}px)` }}
+         onTouchStart={handleTouchStart}
+         onTouchMove={handleTouchMove}
+         onTouchEnd={handleTouchEnd}
+         onClick={handleClick}
+       >
+         {children}
+       </div>
+    </div>
+  )
+}
+
 export const Transactions: React.FC = () => {
   const { transactions, categories, accounts, addTransaction, updateTransaction, deleteTransaction } = useFinance();
   const { navigationParams } = useNavigation();
-  // ... rest of the component
   const currentYear = new Date().getFullYear().toString();
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Transaction> }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; tx?: Transaction }>({ open: false });
@@ -201,7 +327,6 @@ export const Transactions: React.FC = () => {
     amountSign: 'all'
   });
 
-  // ... (rest of logic remains same)
   useEffect(() => {
     if (navigationParams) {
       if (navigationParams.openNew) {
@@ -215,12 +340,29 @@ export const Transactions: React.FC = () => {
     }
   }, [navigationParams]);
 
+  const handleRefreshRate = async (tx: Transaction, currency: string) => {
+    if (currency === 'CHF') return;
+    
+    // Feedback visivo immediato (opzionale) o silent update
+    // Poiché non abbiamo uno stato di loading per riga, facciamo l'update ottimistico o attendiamo
+    try {
+        const rate = await fetchExchangeRate(tx.occurred_on, currency, 'CHF');
+        const newBase = Math.round((tx.amount_original * rate) * 100) / 100;
+        await updateTransaction(tx.id, { amount_base: newBase });
+    } catch (e) {
+        alert("Impossibile aggiornare il tasso di cambio.");
+    }
+  };
+
   const availableYears = useMemo(() => {
     const years = transactions.map(t => parseInt(t.occurred_on.split('-')[0]));
     const unique = Array.from(new Set(years));
     if (!unique.includes(parseInt(currentYear))) unique.push(parseInt(currentYear));
     return unique.sort((a: number, b: number) => b - a).map(String);
   }, [transactions, currentYear]);
+
+  // Options for Year Dropdown
+  const yearOptions = useMemo(() => availableYears.map(y => ({ value: y, label: y })), [availableYears]);
 
   // OPTIMIZATION: Create Lookup Maps O(C) + O(A) to avoid finding in array for every row
   const categoryMap = useMemo(() => {
@@ -322,53 +464,67 @@ export const Transactions: React.FC = () => {
           <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 top-4 w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </div>
         
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 xl:pb-0">
-             <div className="flex items-center p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto no-scrollbar">
-                {availableYears.map(y => <button key={y} onClick={() => setFilters(f => ({ ...f, year: y }))} className={`px-6 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${filters.year === y ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>{y}</button>)}
-            </div>
+        <div className="flex gap-2 items-center">
+             {/* Year Selector Dropdown - Mobile Optimized */}
+             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm min-w-[120px] h-full flex items-center">
+                <CustomSelect 
+                    value={filters.year} 
+                    onChange={(val) => setFilters(f => ({ ...f, year: String(val) }))} 
+                    options={yearOptions}
+                    minimal={false}
+                    className="w-full h-full"
+                />
+             </div>
             
             <button 
                 onClick={() => setShowFilters(!showFilters)} 
-                className={`px-5 py-4 border rounded-2xl font-bold flex items-center space-x-2 transition-all whitespace-nowrap ${showFilters ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                className={`px-5 py-4 border rounded-2xl font-bold flex items-center space-x-2 transition-all whitespace-nowrap h-full ${showFilters ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
                 <span className="hidden md:inline">Filtri</span>
             </button>
             
-            <button onClick={() => setModalState({ open: true })} className="px-5 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2 whitespace-nowrap"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg><span className="hidden md:inline">NUOVO</span></button>
-            <button onClick={resetFilters} className="px-5 py-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <button onClick={() => setModalState({ open: true })} className="px-5 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2 whitespace-nowrap h-full"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg><span className="hidden md:inline">NUOVO</span></button>
+            <button onClick={resetFilters} className="px-5 py-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm h-full"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
       </div>
 
-      {/* Pannello Filtri Collassabile */}
+      {/* Pannello Filtri Collassabile - COMPACT */}
       {showFilters && (
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 mb-6 relative z-20 animate-in slide-in-from-top-4 fade-in duration-300">
             <div className="px-6 py-5 bg-[#fcfdfe] border-b border-slate-100 rounded-t-[2rem] flex flex-wrap gap-2">
-                {monthNames.map((m, i) => <button key={m} onClick={() => toggleMultiSelect('months', i + 1)} className={`flex-1 min-w-[50px] py-3 text-xs font-bold rounded-xl border transition-all ${filters.months.includes(i + 1) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>{m}</button>)}
+                {monthNames.map((m, i) => <button key={m} onClick={() => toggleMultiSelect('months', i + 1)} className={`flex-1 min-w-[50px] py-2 text-[10px] font-bold rounded-xl border transition-all uppercase ${filters.months.includes(i + 1) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>{m}</button>)}
             </div>
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-                <div className="space-y-4 relative z-50">
-                    <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
-                    <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} />
-                    <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                {/* Compact Classification */}
+                <div className="space-y-3 relative z-50">
+                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                        <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} />
+                        <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
+                    </div>
                     <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} />
                 </div>
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Tipo</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                        {typeOptions.map(t => <button key={t} onClick={() => toggleMultiSelect('types', t)} className={`px-3 py-3 text-[11px] font-bold rounded-xl border uppercase ${filters.types.includes(t) ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-slate-200 text-slate-400'}`}>{t}</button>)}
+                
+                {/* Compact Types */}
+                <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Tipo</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {typeOptions.map(t => <button key={t} onClick={() => toggleMultiSelect('types', t)} className={`px-4 py-2 text-[10px] font-bold rounded-full border uppercase transition-colors ${filters.types.includes(t) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>{t}</button>)}
                     </div>
                 </div>
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Segno Importo</h4>
+
+                <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Segno Importo</h4>
                     <div className="grid grid-cols-3 gap-2">
                         <button onClick={() => setFilters(f => ({ ...f, amountSign: 'all' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Tutti</button>
                         <button onClick={() => setFilters(f => ({ ...f, amountSign: 'positive' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'positive' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Entrate</button>
                         <button onClick={() => setFilters(f => ({ ...f, amountSign: 'negative' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'negative' ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Uscite</button>
                     </div>
                 </div>
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Conti (Attivi)</h4>
+                
+                <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Conti</h4>
                     <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar">
                         {accountOptions.map(a => <button key={a} onClick={() => toggleMultiSelect('accounts', a)} className={`px-3 py-2 text-[10px] font-bold rounded-xl border text-left truncate ${filters.accounts.includes(a) ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-slate-200 text-slate-400'}`}>{a}</button>)}
                     </div>
@@ -389,7 +545,7 @@ export const Transactions: React.FC = () => {
                         <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right w-[140px]">Importo</th>
                         <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tag</th>
                         <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Descrizione</th>
-                        <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right w-[100px]">Azioni</th>
+                        <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right w-[120px]">Azioni</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -416,7 +572,7 @@ export const Transactions: React.FC = () => {
                                             {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} 
                                             <span className="text-[10px] opacity-60 ml-1">{acc.currency}</span>
                                         </span>
-                                        {!isSameCurrency && (
+                                        {!isSameCurrency && !isTransfer && (
                                             <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
                                                ≈ {(tx.amount_base || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} CHF
                                             </span>
@@ -431,6 +587,15 @@ export const Transactions: React.FC = () => {
                                 </td>
                                 <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">{tx.description || '-'}</td>
                                 <td className="px-4 py-3 text-right space-x-1">
+                                    {!isSameCurrency && !isTransfer && (
+                                        <button 
+                                            onClick={() => handleRefreshRate(tx, acc.currency)} 
+                                            className="p-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                            title="Aggiorna Cambio (Ricalcola CHF)"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        </button>
+                                    )}
                                     <button onClick={() => setModalState({ open: true, initialData: tx })} className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
                                     <button onClick={() => setDeleteDialog({ open: true, tx })} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </td>
@@ -445,42 +610,62 @@ export const Transactions: React.FC = () => {
          </div>
       </div>
 
+      {/* MOBILE LIST: SWIPEABLE CARDS */}
       <div className="md:hidden space-y-3 relative z-10">
          {filteredTransactions.map(tx => {
             const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
             const acc = getAccountInfoFromMap(tx.account_id);
             const isTransfer = tx.kind === 'transfer';
             const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
+            const isSameCurrency = acc.currency === 'CHF';
             
             return (
-              <div key={tx.id} onClick={() => setModalState({ open: true, initialData: tx })} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.98] transition-transform">
-                 <div className="flex justify-between items-start mb-2">
-                    <div className="flex flex-col">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{new Date(tx.occurred_on).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}</span>
-                       <div className="flex items-center space-x-1.5 mt-0.5">
-                          <span className="text-sm font-bold text-slate-800">{category}</span>
-                          {subcategory !== '-' && <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{subcategory}</span>}
-                       </div>
+              <SwipeableTransactionItem 
+                key={tx.id} 
+                onEdit={() => setModalState({ open: true, initialData: tx })}
+                onDelete={() => setDeleteDialog({ open: true, tx })}
+              >
+                  <div className="p-4 active:scale-[0.98] transition-transform">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{new Date(tx.occurred_on).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}</span>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                            <span className="text-sm font-bold text-slate-800">{category}</span>
+                            {subcategory !== '-' && <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{subcategory}</span>}
+                        </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                        <span className={`text-base font-black ${amountColorClass}`}>
+                            {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                            <span className="text-[9px] ml-0.5 opacity-60">{acc.currency}</span>
+                        </span>
+                        {!isSameCurrency && !isTransfer && (
+                            <div className="flex items-center gap-1.5 mt-0.5 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100">
+                                <span className="text-[10px] font-bold text-slate-500">
+                                    ≈ {(tx.amount_base || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} CHF
+                                </span>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleRefreshRate(tx, acc.currency); }}
+                                    className="p-0.5 text-slate-300 hover:text-blue-600"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </button>
+                            </div>
+                        )}
+                        </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                       <span className={`text-base font-black ${amountColorClass}`}>
-                          {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                          <span className="text-[9px] ml-0.5 opacity-60">{acc.currency}</span>
-                       </span>
+                    <div className="flex justify-between items-end">
+                        <div className="flex flex-col gap-1 w-full">
+                        {tx.description && <span className="text-xs text-slate-500 truncate">{tx.description}</span>}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-[6px] bg-slate-50 border border-slate-100 text-[9px] font-bold text-slate-500 uppercase">{acc.name}</span>
+                            {getKindBadge(tx.kind)}
+                            {tx.tag && <span className="px-1.5 py-0.5 border border-slate-200 rounded text-[9px] font-bold uppercase text-slate-500 bg-white">#{tx.tag}</span>}
+                        </div>
+                        </div>
                     </div>
-                 </div>
-                 <div className="flex justify-between items-end">
-                    <div className="flex flex-col gap-1 max-w-[70%]">
-                       {tx.description && <span className="text-xs text-slate-500 truncate">{tx.description}</span>}
-                       <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-2 py-0.5 rounded-[6px] bg-slate-50 border border-slate-100 text-[9px] font-bold text-slate-500 uppercase">{acc.name}</span>
-                          {getKindBadge(tx.kind)}
-                          {tx.tag && <span className="px-1.5 py-0.5 border border-slate-200 rounded text-[9px] font-bold uppercase text-slate-500 bg-white">#{tx.tag}</span>}
-                       </div>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, tx }); }} className="p-2 bg-slate-50 text-slate-300 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                 </div>
-              </div>
+                  </div>
+              </SwipeableTransactionItem>
             );
          })}
          {filteredTransactions.length === 0 && (
@@ -494,9 +679,21 @@ export const Transactions: React.FC = () => {
       
       <FullScreenModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} title="Gestione Movimenti" subtitle="Help">
         <div className="space-y-6">
-           {/* ... help text ... */}
            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100"><p className="text-sm text-blue-800 leading-relaxed font-medium">Questa sezione è il registro completo delle tue finanze. Qui puoi aggiungere, modificare e categorizzare ogni singola transazione.</p></div>
-           {/* ... */}
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Azioni Mobile</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>destra</strong> per Modificare.</span>
+                 </li>
+                 <li className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>sinistra</strong> per Eliminare.</span>
+                 </li>
+              </ul>
+           </div>
         </div>
       </FullScreenModal>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { EssentialTransaction, Category, Transaction, Account } from '../types';
@@ -360,9 +359,19 @@ export const Recurrences: React.FC = () => {
   const handleSaveTransaction = async (tx: Partial<Transaction>) => {
       let finalAmount = tx.amount_original || 0;
       const expenseKinds = ['essential', 'personal', 'expense'];
+      
+      // Flip sign for amounts if it's an expense
       if (expenseKinds.includes(tx.kind || '') && finalAmount > 0) finalAmount = -finalAmount;
-      let finalBase = tx.amount_base || 0;
-      if (expenseKinds.includes(tx.kind || '') && finalBase > 0) finalBase = -finalBase;
+      
+      let finalBase = 0;
+
+      // MODIFICATO: Se è transfer, amount_base è sempre 0.
+      if (tx.kind === 'transfer') {
+          finalBase = 0;
+      } else {
+          finalBase = tx.amount_base || 0;
+          if (expenseKinds.includes(tx.kind || '') && finalBase > 0) finalBase = -finalBase;
+      }
 
       const payload = { ...tx, amount_original: finalAmount, amount_base: finalBase };
       if (tx.id) await updateTransaction(tx.id, payload);
@@ -380,7 +389,7 @@ export const Recurrences: React.FC = () => {
       await addTransaction({
           account_id: fromAccount,
           amount_original: -Math.abs(fromAmount),
-          amount_base: 0, 
+          amount_base: 0, // Ensure no conversion
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
@@ -389,7 +398,7 @@ export const Recurrences: React.FC = () => {
       await addTransaction({
           account_id: toAccount,
           amount_original: Math.abs(toAmount),
-          amount_base: 0, 
+          amount_base: 0, // Ensure no conversion
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
@@ -401,9 +410,10 @@ export const Recurrences: React.FC = () => {
       }
   };
 
-  const availableYears = useMemo(() => {
+  const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
-    return [current - 1, current, current + 1];
+    const years = [current - 1, current, current + 1];
+    return years.map(y => ({ value: y, label: y.toString() }));
   }, []);
 
   const renderTable = (title: string, names: string[], lookupMap: Map<string, EssentialTransaction>, colorTheme: 'rose' | 'blue') => {
@@ -538,34 +548,40 @@ export const Recurrences: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-28">
       {/* Header e Selettore Anno */}
-      <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-         <div className="flex items-center space-x-4">
-            <div className="flex items-center gap-3">
-               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Pianificazione</h2>
-               <button 
-                  onClick={() => setIsInfoOpen(true)}
-                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
-               >
-                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-               </button>
-            </div>
-            <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block"></div>
-            <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex items-center">
-                 {availableYears.map(y => (
-                     <button 
-                        key={y}
-                        onClick={() => setSelectedYear(y)}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                     >
-                        {y}
-                     </button>
-                 ))}
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+         {/* Title Section */}
+         <div className="flex items-center gap-3">
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Pianificazione</h2>
+            <button 
+               onClick={() => setIsInfoOpen(true)}
+               className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
          </div>
-         <button onClick={() => setModalState({ open: true })} className="px-6 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-            <span>NUOVA VOCE</span>
-         </button>
+
+         {/* Controls Section */}
+         <div className="flex items-stretch md:items-center gap-3 w-full md:w-auto">
+            {/* Year Selector Dropdown */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm min-w-[120px] flex items-center">
+                <CustomSelect 
+                    value={selectedYear} 
+                    onChange={(val) => setSelectedYear(Number(val))} 
+                    options={yearOptions}
+                    minimal={false}
+                    className="w-full"
+                />
+            </div>
+            
+            {/* Add Button */}
+            <button 
+                onClick={() => setModalState({ open: true })} 
+                className="flex-1 md:flex-none px-6 py-3.5 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center space-x-2 whitespace-nowrap"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                <span>NUOVA VOCE</span>
+            </button>
+         </div>
       </div>
 
       {/* TABLE 1: Essential Expenses */}
