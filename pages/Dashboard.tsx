@@ -5,6 +5,12 @@ import { useNavigation } from '../NavigationContext';
 import { AppSection } from '../types';
 import { FullScreenModal } from '../components/FullScreenModal';
 import { CustomSelect } from '../components/CustomSelect';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell 
+} from 'recharts';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
 export const Dashboard: React.FC = () => {
   const { transactions, accounts, investments, investmentTrends, essentialTransactions, categories } = useFinance();
@@ -193,7 +199,7 @@ export const Dashboard: React.FC = () => {
 
   // 5. Matrice Dati (Sempre Annuale, ma evidenzia mese corrente)
   const matrixData = useMemo(() => {
-    const data = Array.from({ length: 12 }, () => ({ income: 0, variable: 0, fixed: 0, work: 0 }));
+    const data = Array.from({ length: 12 }, () => ({ income: 0, variable: 0, fixed: 0, workIncome: 0, workExpense: 0 }));
     transactions.forEach(t => {
       const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
       if (tYear !== selectedYear) return;
@@ -204,7 +210,10 @@ export const Dashboard: React.FC = () => {
       if (t.kind === 'income' || (t.kind === 'personal' && amount > 0)) data[monthIdx].income += amount;
       else if (t.kind === 'personal' && amount < 0) data[monthIdx].variable += amount;
       else if (t.kind === 'essential') data[monthIdx].fixed += amount;
-      else if (t.kind === 'work') data[monthIdx].work += amount;
+      else if (t.kind === 'work') {
+          if (amount >= 0) data[monthIdx].workIncome += amount;
+          else data[monthIdx].workExpense += amount;
+      }
     });
     return data;
   }, [transactions, selectedYear]);
@@ -213,20 +222,22 @@ export const Dashboard: React.FC = () => {
       income: acc.income + curr.income,
       variable: acc.variable + curr.variable,
       fixed: acc.fixed + curr.fixed,
-      work: acc.work + curr.work
-    }), { income: 0, variable: 0, fixed: 0, work: 0 }), [matrixData]);
+      workIncome: acc.workIncome + curr.workIncome,
+      workExpense: acc.workExpense + curr.workExpense
+    }), { income: 0, variable: 0, fixed: 0, workIncome: 0, workExpense: 0 }), [matrixData]);
 
-  const grandTotalNet = matrixTotals.income + matrixTotals.variable + matrixTotals.fixed + matrixTotals.work;
+  const grandTotalNet = matrixTotals.income + matrixTotals.variable + matrixTotals.fixed + matrixTotals.workIncome + matrixTotals.workExpense;
 
   // --- NAVIGATION HELPERS ---
-  const goToTransactions = (monthIdx: number, type: 'income' | 'variable' | 'fixed' | 'work') => {
+  const goToTransactions = (monthIdx: number, type: 'income' | 'variable' | 'fixed' | 'work_income' | 'work_expense') => {
     const monthsFilter = monthIdx === -1 ? [] : [monthIdx + 1];
     const params: any = { year: selectedYear.toString(), months: monthsFilter, search: '', accounts: [], category: '', subcategory: '', tag: '' };
 
     if (type === 'income') { params.types = ['income', 'personal']; params.amountSign = 'positive'; } 
     else if (type === 'variable') { params.types = ['personal']; params.amountSign = 'negative'; } 
     else if (type === 'fixed') { params.types = ['essential']; params.amountSign = 'all'; } 
-    else if (type === 'work') { params.types = ['work']; params.amountSign = 'all'; }
+    else if (type === 'work_income') { params.types = ['work']; params.amountSign = 'positive'; }
+    else if (type === 'work_expense') { params.types = ['work']; params.amountSign = 'negative'; }
 
     navigateTo(AppSection.Movimenti, params);
   };
@@ -499,13 +510,13 @@ export const Dashboard: React.FC = () => {
                          <th className="w-[80px] px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Mese</th>
                          <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Entrate</th>
                          <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Uscite <span className="text-[8px] font-medium text-slate-400 normal-case block">(Var / Fisse)</span></th>
-                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Lavoro</th>
+                         <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Lavoro <span className="text-[8px] font-medium text-slate-400 normal-case block">(Entrate / Uscite)</span></th>
                          <th className="px-2 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Netto</th>
                       </tr>
                    </thead>
                    <tbody>
                       {matrixData.map((data, idx) => {
-                         const rowTotal = data.income + data.variable + data.fixed + data.work;
+                         const rowTotal = data.income + data.variable + data.fixed + data.workIncome + data.workExpense;
                          const isSelected = idx === selectedMonth;
                          
                          // Mostra solo righe con dati o mese selezionato per risparmiare spazio
@@ -544,11 +555,24 @@ export const Dashboard: React.FC = () => {
                                   </div>
                                </td>
 
-                               {/* Lavoro */}
-                               <td onClick={() => goToTransactions(idx, 'work')} className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-amber-50/50 transition-colors">
-                                  <span className={`text-xs font-mono font-medium ${data.work !== 0 ? 'text-amber-600' : 'text-slate-300'}`}>
-                                    {data.work !== 0 ? data.work.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
-                                  </span>
+                               {/* Lavoro (Entrate + Uscite) */}
+                               <td className="px-2 py-2 text-center align-middle cursor-pointer hover:bg-amber-50/50 transition-colors">
+                                  <div className="flex flex-col gap-0.5 items-center justify-center">
+                                      {/* Work Income (Positive - Green) */}
+                                      <span 
+                                        onClick={() => goToTransactions(idx, 'work_income')}
+                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workIncome !== 0 ? 'text-emerald-600' : 'text-slate-300'}`}
+                                      >
+                                        {data.workIncome !== 0 ? data.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
+                                      </span>
+                                      {/* Work Expense (Negative - Red) */}
+                                      <span 
+                                        onClick={() => goToTransactions(idx, 'work_expense')}
+                                        className={`text-[10px] font-mono font-bold leading-none hover:underline ${data.workExpense !== 0 ? 'text-rose-500' : 'text-slate-300'}`}
+                                      >
+                                        {data.workExpense !== 0 ? data.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 }) : '-'}
+                                      </span>
+                                  </div>
                                </td>
 
                                {/* Netto */}
@@ -571,7 +595,12 @@ export const Dashboard: React.FC = () => {
                                 <span onClick={() => goToTransactions(-1, 'fixed')} className="text-[10px] font-mono font-bold text-rose-500 leading-none cursor-pointer hover:underline">{matrixTotals.fixed.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
                              </div>
                          </td>
-                         <td onClick={() => goToTransactions(-1, 'work')} className="px-2 py-2 text-center font-mono text-xs font-bold text-amber-600 cursor-pointer hover:bg-slate-100">{matrixTotals.work.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
+                         <td className="px-2 py-2 text-center align-middle">
+                             <div className="flex flex-col gap-0.5 items-center justify-center">
+                                <span onClick={() => goToTransactions(-1, 'work_income')} className="text-[10px] font-mono font-bold text-emerald-600 leading-none cursor-pointer hover:underline">{matrixTotals.workIncome.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                                <span onClick={() => goToTransactions(-1, 'work_expense')} className="text-[10px] font-mono font-bold text-rose-500 leading-none cursor-pointer hover:underline">{matrixTotals.workExpense.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
+                             </div>
+                         </td>
                          <td className={`px-2 py-2 text-center font-mono text-xs font-black align-middle ${grandTotalNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{grandTotalNet.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</td>
                       </tr>
                    </tfoot>
@@ -583,33 +612,37 @@ export const Dashboard: React.FC = () => {
       <FullScreenModal 
         isOpen={isInfoOpen} 
         onClose={() => setIsInfoOpen(false)} 
-        title="Dashboard Help"
-        subtitle="Guida ai Widget"
+        title="Report Finanziario"
+        subtitle="Help"
       >
         <div className="space-y-6">
-            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                <p className="text-sm text-slate-500 leading-relaxed">
-                    La Dashboard è la tua torre di controllo. È divisa in tre aree logiche per darti le risposte che cerchi in un secondo.
-                </p>
-            </div>
-            
-            <div className="grid gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-xs font-bold text-blue-600 uppercase">1. Patrimonio</span>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Le prime due card ti dicono "Quanto ho?". Sommano i saldi dei tuoi conti (Liquidità) e il valore dei tuoi investimenti <strong>personali</strong>. 
-                        <br/>
-                        <strong>Nota:</strong> Questi dati sono sempre aggiornati all'ultimo valore inserito (OGGI), indipendentemente dal mese selezionato sotto.
-                    </p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <span className="text-xs font-bold text-emerald-600 uppercase">2. Analisi Periodo</span>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        I widget sotto la barra dei filtri (Pulse, Spese Fisse, Cashflow) si aggiornano in base al Mese e Anno selezionati. 
-                        La barra centrale mostra la composizione dei flussi <strong>personali</strong> (escluso lavoro).
-                    </p>
-                </div>
-            </div>
+           <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+               <p className="text-sm text-indigo-800 leading-relaxed font-medium">
+                  Questa dashboard ti aiuta a capire dove vanno i tuoi soldi e quanto stai risparmiando.
+               </p>
+           </div>
+           
+           <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Dettagli Calcoli</h4>
+              <ul className="space-y-3">
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">I movimenti classificati come <span className="font-bold text-slate-900">Work</span> (rimborsi spese, stipendi extra, spese aziendali) e <span className="font-bold text-slate-900">Transfer</span> (giroconti) sono <strong>esclusi</strong> dai grafici "Pulse" e "Ripartizione Spese" per non falsare il calcolo delle spese nette personali.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Nel <strong>Cashflow</strong>, la colonna "Lavoro" separa le entrate (verde, sopra) dalle uscite (rosso, sotto) classificate come 'Work'.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Il <strong>Savings Rate</strong> è calcolato come: <em className="text-slate-500">(Entrate - Uscite) / Entrate</em>.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Le spese sono convertite in CHF alla data del movimento.</p>
+                 </li>
+              </ul>
+           </div>
         </div>
       </FullScreenModal>
 
