@@ -70,7 +70,7 @@ const AppContent: React.FC = () => {
       case AppSection.Categorie: return <Categories />;
       case AppSection.Tag: return <Tags />;
       case AppSection.Investimenti: return <Investments />;
-      case AppSection.Ricorrenze: return <Recurrences />;
+      case AppSection.SpeseEssenziali: return <Recurrences />;
       case AppSection.Analisi: return <Analysis />;
       default: return <Dashboard />;
     }

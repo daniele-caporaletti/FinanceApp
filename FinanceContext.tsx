@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { FinanceData, Account, Category, Transaction, RecurringTransaction, Investment, InvestmentTrend } from './types';
+import { FinanceData, Account, Category, Transaction, EssentialTransaction, Investment, InvestmentTrend } from './types';
 import { supabaseFetch, supabaseUpdate, supabaseInsert, supabaseDelete } from './supabaseService';
 import { useAuth } from './AuthContext';
 import { supabase } from './utils/supabase';
@@ -15,9 +15,9 @@ interface FinanceContextType extends FinanceData {
   addTransaction: (tx: Partial<Transaction>) => Promise<void>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
-  addRecurring: (rec: Partial<RecurringTransaction>) => Promise<void>;
-  updateRecurring: (id: string, updates: Partial<RecurringTransaction>) => Promise<void>;
-  deleteRecurring: (id: string) => Promise<void>;
+  addEssential: (rec: Partial<EssentialTransaction>) => Promise<void>;
+  updateEssential: (id: string, updates: Partial<EssentialTransaction>) => Promise<void>;
+  deleteEssential: (id: string) => Promise<void>;
   addInvestment: (inv: Partial<Investment>) => Promise<void>;
   updateInvestment: (id: string, updates: Partial<Investment>) => Promise<void>;
   deleteInvestment: (id: string) => Promise<void>;
@@ -35,7 +35,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     accounts: [],
     categories: [],
     transactions: [],
-    recurringTransactions: [],
+    essentialTransactions: [],
     investments: [],
     investmentTrends: [],
     isSyncing: true,
@@ -43,38 +43,32 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const syncData = useCallback(async () => {
-    // Recupera l'utente corrente direttamente da supabase per sicurezza
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) return;
 
     setData(prev => ({ ...prev, isSyncing: true, error: null }));
     
     try {
-      // Usiamo allSettled per non bloccare tutto se una sola tabella fallisce (es. RLS permission denied)
       const results = await Promise.allSettled([
         supabaseFetch<Account>('accounts'),
         supabaseFetch<Category>('categories'),
         supabaseFetch<Transaction>('transactions'),
         supabaseFetch<Investment>('investment'),
         supabaseFetch<InvestmentTrend>('investment_trends'),
-        supabaseFetch<RecurringTransaction>('recurring_transactions')
+        supabaseFetch<EssentialTransaction>('essential_transactions')
       ]);
 
-      const [resAcc, resCat, resTx, resInv, resTrends, resRec] = results;
+      const [resAcc, resCat, resTx, resInv, resTrends, resEss] = results;
       
       const newData: Partial<FinanceData> = {};
       const errors: string[] = [];
 
-      // Helper per estrarre dati o errori
       const processResult = <T,>(res: PromiseSettledResult<T[]>, name: string): T[] => {
         if (res.status === 'fulfilled') {
           return res.value;
         } else {
           console.error(`Failed to fetch ${name}:`, res.reason);
-          // Ignoriamo errore se tabella ricorrenze non esiste, altrimenti lo segnaliamo
-          if (name !== 'recurring_transactions') {
-             errors.push(`${name}: ${res.reason.message || 'Error'}`);
-          }
+          errors.push(`${name}: ${res.reason.message || 'Error'}`);
           return [];
         }
       };
@@ -84,13 +78,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       newData.transactions = processResult(resTx, 'transactions');
       newData.investments = processResult(resInv, 'investment');
       newData.investmentTrends = processResult(resTrends, 'investment_trends');
-      newData.recurringTransactions = processResult(resRec, 'recurring_transactions');
+      newData.essentialTransactions = processResult(resEss, 'essential_transactions');
 
       setData(prev => ({
         ...prev,
         ...newData,
         isSyncing: false,
-        error: errors.length > 0 ? `Sync incompleto (RLS?): ${errors.join(', ')}` : null
+        error: errors.length > 0 ? `Sync incompleto: ${errors.join(', ')}` : null
       }));
 
     } catch (err) {
@@ -122,25 +116,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // --- CATEGORIES ---
   const addCategory = async (category: Partial<Category>) => {
-    // Check user directly from supabase to avoid context staleness
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) throw new Error("Utente non autenticato");
-
     try {
-      // Costruisci payload pulito
       const payload = {
         name: category.name,
-        parent_id: category.parent_id || null, // Assicurati che sia null se vuoto
+        parent_id: category.parent_id || null,
         user_id: currentUser.id,
         is_archived: category.is_archived || false
       };
-
       const newCat = await supabaseInsert<Category>('categories', payload);
       setData(prev => ({ ...prev, categories: [...prev.categories, newCat] }));
-    } catch (err) { 
-        console.error("Failed to add category:", err); 
-        throw err; 
-    }
+    } catch (err) { console.error("Failed to add category:", err); throw err; }
   };
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
@@ -181,28 +168,28 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) { console.error("Failed to delete transaction:", err); throw err; }
   };
 
-  // --- RECURRING TRANSACTIONS ---
-  const addRecurring = async (rec: Partial<RecurringTransaction>) => {
+  // --- ESSENTIAL TRANSACTIONS (Ex Recurring) ---
+  const addEssential = async (rec: Partial<EssentialTransaction>) => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) throw new Error("Utente non autenticato");
     try {
-      const newRec = await supabaseInsert<RecurringTransaction>('recurring_transactions', { ...rec, user_id: currentUser.id });
-      setData(prev => ({ ...prev, recurringTransactions: [...prev.recurringTransactions, newRec] }));
-    } catch (err) { console.error("Failed to add recurring:", err); throw err; }
+      const newRec = await supabaseInsert<EssentialTransaction>('essential_transactions', { ...rec, user_id: currentUser.id });
+      setData(prev => ({ ...prev, essentialTransactions: [...prev.essentialTransactions, newRec] }));
+    } catch (err) { console.error("Failed to add essential:", err); throw err; }
   };
 
-  const updateRecurring = async (id: string, updates: Partial<RecurringTransaction>) => {
+  const updateEssential = async (id: string, updates: Partial<EssentialTransaction>) => {
     try {
-      setData(prev => ({ ...prev, recurringTransactions: prev.recurringTransactions.map(r => r.id === id ? { ...r, ...updates } : r) }));
-      await supabaseUpdate('recurring_transactions', id, updates);
-    } catch (err) { console.error("Failed to update recurring:", err); throw err; }
+      setData(prev => ({ ...prev, essentialTransactions: prev.essentialTransactions.map(r => r.id === id ? { ...r, ...updates } : r) }));
+      await supabaseUpdate('essential_transactions', id, updates);
+    } catch (err) { console.error("Failed to update essential:", err); throw err; }
   };
 
-  const deleteRecurring = async (id: string) => {
+  const deleteEssential = async (id: string) => {
     try {
-      await supabaseDelete('recurring_transactions', id);
-      setData(prev => ({ ...prev, recurringTransactions: prev.recurringTransactions.filter(r => r.id !== id) }));
-    } catch (err) { console.error("Failed to delete recurring:", err); throw err; }
+      await supabaseDelete('essential_transactions', id);
+      setData(prev => ({ ...prev, essentialTransactions: prev.essentialTransactions.filter(r => r.id !== id) }));
+    } catch (err) { console.error("Failed to delete essential:", err); throw err; }
   };
 
   // --- INVESTMENTS ---
@@ -232,11 +219,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // --- INVESTMENT TRENDS ---
   const addTrend = async (trend: Partial<InvestmentTrend>) => {
     try {
-      // investment_trend table usually doesn't have user_id if it's child of investment which has user_id, 
-      // BUT RLS might require it. If your schema has user_id in trends, add it here.
-      // Assuming it does NOT based on types.ts (only investment_id).
-      // However, if RLS is on 'investment_trends', user must have permission.
-      // Permission is usually checked via join or if trends has user_id.
       const newTrend = await supabaseInsert<InvestmentTrend>('investment_trends', trend);
       setData(prev => ({ ...prev, investmentTrends: [...prev.investmentTrends, newTrend] }));
     } catch (err) { console.error("Failed to add trend:", err); throw err; }
@@ -269,7 +251,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateAccount, addAccount, 
       addCategory, updateCategory, deleteCategory,
       addTransaction, updateTransaction, deleteTransaction,
-      addRecurring, updateRecurring, deleteRecurring,
+      addEssential, updateEssential, deleteEssential,
       addInvestment, updateInvestment, deleteInvestment,
       addTrend, updateTrend, deleteTrend
     }}>

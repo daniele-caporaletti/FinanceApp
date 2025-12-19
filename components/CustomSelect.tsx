@@ -14,6 +14,7 @@ interface CustomSelectProps {
   disabled?: boolean;
   className?: string;
   minimal?: boolean; // For dashboard header style
+  anchor?: 'left' | 'right'; // Control dropdown alignment
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({ 
@@ -23,7 +24,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   placeholder = "Seleziona...", 
   disabled = false,
   className = "",
-  minimal = false
+  minimal = false,
+  anchor = 'left'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     ? `flex items-center space-x-2 font-bold text-slate-900 cursor-pointer outline-none transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-70'}`
     : `w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none flex justify-between items-center transition-all ${isOpen ? 'ring-4 ring-blue-50 border-blue-500' : 'hover:bg-slate-100'} ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-100' : 'cursor-pointer bg-slate-50'}`;
 
+  // Dropdown positioning
+  const dropdownClasses = `absolute z-[100] mt-2 min-w-[180px] bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto custom-scrollbar ${anchor === 'right' ? 'right-0' : 'left-0'} ${!minimal ? 'w-full' : ''}`;
+
   return (
     <div className={containerBase} ref={containerRef}>
       {/* Trigger */}
@@ -75,7 +80,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute z-[100] mt-2 w-full min-w-[180px] bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto custom-scrollbar left-0">
+        <div className={dropdownClasses}>
           <div className="p-1.5">
             {options.map((opt) => {
                 const isSelected = String(opt.value) === String(value);

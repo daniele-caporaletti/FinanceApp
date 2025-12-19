@@ -27,18 +27,20 @@ export interface Transaction {
   category_id: string | null;
   tag: string | null;
   description: string | null;
+  essential_transaction_id: string | null; // Foreign Key
 }
 
-export interface RecurringTransaction {
+export interface EssentialTransaction {
   id: string;
   user_id: string;
   name: string;
   is_active: boolean;
-  occurred_on: string; // Usato come data di riferimento (es. giorno del mese)
+  occurred_on: string; 
   kind: 'income' | 'expense' | 'transfer' | string;
   amount_original: number;
+  currency_original: string; // Rinominato per corrispondere al DB
   category_id: string | null;
-  frequency?: 'monthly' | 'yearly';
+  description: string | null; // Note
 }
 
 export interface Investment {
@@ -53,16 +55,16 @@ export interface Investment {
 export interface InvestmentTrend {
   id: string;
   investment_id: string;
-  value_on: string; // Corrisponde alla colonna del DB
-  cash_flow: number; // Versato nel mese
-  value_original: number; // Valore di mercato alla data (colonna DB)
+  value_on: string; 
+  cash_flow: number; 
+  value_original: number; 
 }
 
 export interface FinanceData {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
-  recurringTransactions: RecurringTransaction[];
+  essentialTransactions: EssentialTransaction[];
   investments: Investment[];
   investmentTrends: InvestmentTrend[];
   isSyncing: boolean;
@@ -77,5 +79,5 @@ export enum AppSection {
   Categorie = 'categorie',
   Investimenti = 'investimenti',
   Analisi = 'analisi',
-  Ricorrenze = 'ricorrenze'
+  SpeseEssenziali = 'spese_essenziali'
 }

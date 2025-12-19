@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Account } from '../types';
 import { FullScreenModal } from '../components/FullScreenModal';
@@ -115,6 +115,24 @@ export const Accounts: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Account> }>({ open: false });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  
+  // Tassi di cambio per il calcolo totale
+  const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const [resEur, resUsd] = await Promise.all([
+          fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF'),
+          fetch('https://api.frankfurter.app/latest?from=USD&to=CHF')
+        ]);
+        const dataEur = await resEur.json();
+        const dataUsd = await resUsd.json();
+        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
+      } catch (error) { console.error("Rate fetch error", error); }
+    };
+    fetchRates();
+  }, []);
 
   const calculateBalance = (accountId: string) => {
     return transactions
@@ -131,8 +149,12 @@ export const Accounts: React.FC = () => {
   const inactiveAccounts = useMemo(() => accounts.filter(a => a.status !== 'active'), [accounts]);
   
   const totalActiveBalance = useMemo(() => {
-    return activeAccounts.reduce((sum, acc) => sum + calculateBalance(acc.id), 0);
-  }, [activeAccounts, transactions]);
+    return activeAccounts.reduce((sum, acc) => {
+        const balance = calculateBalance(acc.id);
+        const rate = rates[acc.currency_code] || 1;
+        return sum + (balance * rate);
+    }, 0);
+  }, [activeAccounts, transactions, rates]);
 
   const displayedAccounts = useMemo(() => {
     const list = showInactive ? [...activeAccounts, ...inactiveAccounts] : activeAccounts;
@@ -340,7 +362,7 @@ export const Accounts: React.FC = () => {
               <ul className="space-y-3">
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Patrimonio Attivo:</span> È la somma dei saldi di tutti i conti <strong>attivi</strong>. Se archivi un conto, il suo saldo non verrà più conteggiato nel totale in alto, ma lo storico movimenti rimarrà salvo.</p>
+                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Patrimonio Attivo:</span> È la somma convertita in CHF dei saldi di tutti i conti <strong>attivi</strong>. I conti in valuta estera vengono convertiti al tasso attuale.</p>
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>

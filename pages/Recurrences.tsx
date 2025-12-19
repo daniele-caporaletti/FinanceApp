@@ -1,22 +1,33 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
-import { RecurringTransaction, Category, Account, Transaction } from '../types';
-import { fetchExchangeRate } from '../utils/helpers';
+import { EssentialTransaction, Category, Account, Transaction } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { FullScreenModal } from '../components/FullScreenModal';
 import { CustomSelect } from '../components/CustomSelect';
+import { TransactionModal } from './Transactions';
 
-interface RecurrenceModalProps {
+// Helper per gestire le date come stringhe YYYY-MM-DD senza offset timezone
+const getSafeDateString = (year: number, monthIndex: number, day: number) => {
+    const date = new Date(year, monthIndex, 1);
+    const maxDay = new Date(year, monthIndex + 1, 0).getDate();
+    const safeDay = Math.min(day, maxDay);
+    
+    const m = String(monthIndex + 1).padStart(2, '0');
+    const d = String(safeDay).padStart(2, '0');
+    return `${year}-${m}-${d}`;
+};
+
+interface EssentialExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (rec: Partial<RecurringTransaction>) => Promise<void>;
-  initialData?: Partial<RecurringTransaction>;
+  onSave: (rec: Partial<EssentialTransaction>) => Promise<void>;
+  initialData?: Partial<EssentialTransaction>;
   categories: Category[];
 }
 
-const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSave, initialData, categories }) => {
-  const [formData, setFormData] = useState<Partial<RecurringTransaction>>({});
+const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, onClose, onSave, initialData, categories }) => {
+  const [formData, setFormData] = useState<Partial<EssentialTransaction>>({});
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string>('');
 
@@ -27,9 +38,10 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
         occurred_on: new Date().toISOString().split('T')[0],
         kind: 'essential',
         amount_original: undefined,
+        currency_original: 'CHF',
         category_id: null,
         is_active: true,
-        frequency: 'monthly'
+        description: '' // Note
       });
       if (initialData?.category_id) {
         const currentCat = categories.find(c => c.id === initialData.category_id);
@@ -62,11 +74,6 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
       ...subCategories.map(s => ({ value: s.id, label: s.name }))
   ];
 
-  const frequencyOptions = [
-      { value: 'monthly', label: 'Mensile (12/anno)' },
-      { value: 'yearly', label: 'Annuale (1/anno)' }
-  ];
-
   const typeOptions = [
     { value: 'essential', label: 'Essential' },
     { value: 'personal', label: 'Personal' },
@@ -74,30 +81,35 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
     { value: 'transfer', label: 'Giroconto' }
   ];
 
+  const currencyOptions = [
+      { value: 'CHF', label: 'CHF' },
+      { value: 'EUR', label: 'EUR' },
+      { value: 'USD', label: 'USD' }
+  ];
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-black text-slate-900">{initialData?.id ? 'Modifica Ricorrenza' : 'Nuova Ricorrenza'}</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gestione Spese Fisse</p>
+            <h2 className="text-xl font-black text-slate-900">{initialData?.id ? 'Modifica Regola' : 'Nuova Voce'}</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Budget Lifestyle</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 bg-slate-50 rounded-full">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
-          <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nome Ricorrenza</label><input required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. Affitto, Netflix..." value={formData.name || ''} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} /></div>
+          <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nome Spesa</label><input required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. Affitto, Netflix..." value={formData.name || ''} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} /></div>
           
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data Riferimento</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /><p className="text-[9px] text-slate-400 px-1">Il giorno sarà usato come riferimento mensile.</p></div>
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Frequenza</label><CustomSelect value={formData.frequency} onChange={(val) => setFormData(f => ({ ...f, frequency: val }))} options={frequencyOptions} /></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Giorno Previsto</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /><p className="text-[9px] text-slate-400 px-1">La data determina in quale mese/anno apparirà il pallino.</p></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
           </div>
           
-          <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
-             <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Stimato</label>
+          <div className="grid grid-cols-3 gap-6">
+             <div className="col-span-2 space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Previsto</label>
                 <input 
                     type="number" 
                     step="0.01" 
@@ -108,211 +120,189 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
                     onChange={e => setFormData(f => ({ ...f, amount_original: e.target.value === '' ? undefined : parseFloat(e.target.value) }))} 
                 />
              </div>
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Valuta</label>
+                <CustomSelect value={formData.currency_original || 'CHF'} onChange={(val) => setFormData(f => ({ ...f, currency_original: val }))} options={currencyOptions} />
+             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
              <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
              <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
           </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Note (Descrizione Movimento)</label>
+            <textarea 
+                rows={2} 
+                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 resize-none" 
+                placeholder="es. Scade il 15, Addebito automatico..." 
+                value={formData.description || ''} 
+                onChange={e => setFormData(f => ({ ...f, description: e.target.value }))} 
+            />
+            <p className="text-[9px] text-slate-400 px-1">Questo testo sarà precompilato nel campo 'Descrizione' quando paghi.</p>
+          </div>
           
           <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-2xl border border-slate-200 cursor-pointer" onClick={() => setFormData(f => ({ ...f, is_active: !f.is_active }))}>
              <div className={`w-10 h-5 rounded-full relative transition-all ${formData.is_active ? 'bg-blue-600' : 'bg-slate-300'}`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${formData.is_active ? 'left-6' : 'left-1'}`}></div>
              </div>
-             <span className="text-xs font-bold text-slate-700">Ricorrenza Attiva</span>
+             <span className="text-xs font-bold text-slate-700">Voce Attiva</span>
           </div>
 
-          <button type="submit" disabled={loading} className={`w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Salva Template'}</button>
+          <button type="submit" disabled={loading} className={`w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Salva Voce'}</button>
         </form>
       </div>
     </div>
   );
 };
 
-interface ConfirmGenerationModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: (date: string, amount: number, accountId: string) => Promise<void>;
-    recurrenceName: string;
-    defaultDate: string;
-    defaultAmount: number;
-    accounts: Account[];
-}
-
-const ConfirmGenerationModal: React.FC<ConfirmGenerationModalProps> = ({ isOpen, onClose, onConfirm, recurrenceName, defaultDate, defaultAmount, accounts }) => {
-    const [date, setDate] = useState(defaultDate);
-    const [amount, setAmount] = useState<number | undefined>(defaultAmount);
-    const [accountId, setAccountId] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    // Filtra i conti attivi e visibili in overview
-    const visibleAccounts = useMemo(() => {
-        return accounts.filter(a => a.status === 'active' && !a.exclude_from_overview);
-    }, [accounts]);
-
-    const accountOptions = visibleAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.currency_code})` }));
-
-    useEffect(() => { 
-        setDate(defaultDate); 
-        setAmount(defaultAmount);
-        // RIMOSSO: setAccountId(visibleAccounts[0].id); -> Ora l'utente deve selezionare esplicitamente
-        setAccountId('');
-    }, [defaultDate, defaultAmount, isOpen, visibleAccounts]);
-
-    if (!isOpen) return null;
-
-    const selectedAccount = accounts.find(a => a.id === accountId);
-    const currency = selectedAccount?.currency_code || 'CHF';
-
-    const handleConfirm = async () => {
-        if (!accountId) {
-          alert("Seleziona un conto.");
-          return;
-        }
-        setLoading(true);
-        await onConfirm(date, amount || 0, accountId);
-        setLoading(false);
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-slate-100">
-                <h3 className="text-xl font-bold text-slate-900 mb-1">Genera Movimento</h3>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">{recurrenceName}</p>
-                
-                <div className="space-y-4 mb-6">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data Effettiva</label>
-                        <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500" value={date} onChange={e => setDate(e.target.value)} />
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto di Pagamento</label>
-                        <CustomSelect value={accountId} onChange={(val) => setAccountId(val)} options={accountOptions} placeholder="Seleziona..." />
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Reale ({currency})</label>
-                        <input 
-                            type="number" 
-                            step="0.01" 
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                            value={amount ?? ''} 
-                            onChange={e => setAmount(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
-                        />
-                        <p className="text-[9px] text-slate-400 leading-tight px-1">Modifica l'importo se quest'anno la cifra è diversa dal solito. La ricorrenza originale non verrà modificata.</p>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <button onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-50 active:scale-[0.98] transition-all">{loading ? '...' : 'Conferma e Inserisci'}</button>
-                    <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all">Annulla</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 export const Recurrences: React.FC = () => {
-  const { recurringTransactions, transactions, accounts, categories, addRecurring, updateRecurring, deleteRecurring, addTransaction } = useFinance();
+  const { essentialTransactions, transactions, accounts, categories, addEssential, updateEssential, deleteEssential, addTransaction, updateTransaction } = useFinance();
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   
-  const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<RecurringTransaction> }>({ open: false });
-  const [genModal, setGenModal] = useState<{ open: boolean; recurrence?: RecurringTransaction; defaultDate: string }>({ open: false, defaultDate: '' });
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; rec?: RecurringTransaction }>({ open: false });
+  const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<EssentialTransaction> }>({ open: false });
+  const [payModal, setPayModal] = useState<{ open: boolean; initialData?: Partial<Transaction>; isEdit?: boolean }>({ open: false });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; rec?: EssentialTransaction }>({ open: false });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
-  // Ordina ricorrenze per nome
-  const sortedRecurrences = useMemo(() => {
-    return [...recurringTransactions].sort((a, b) => a.name.localeCompare(b.name));
-  }, [recurringTransactions]);
+  // Tassi di cambio per il calcolo totale
+  const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const [resEur, resUsd] = await Promise.all([
+          fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF'),
+          fetch('https://api.frankfurter.app/latest?from=USD&to=CHF')
+        ]);
+        const dataEur = await resEur.json();
+        const dataUsd = await resUsd.json();
+        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
+      } catch (error) { console.error("Rate fetch error", error); }
+    };
+    fetchRates();
+  }, []);
+
+  // 1. Group EssentialTransactions by Name
+  const uniqueNames = useMemo(() => {
+      const names = new Set<string>();
+      essentialTransactions.forEach(t => {
+          const [tYear] = t.occurred_on.split('-').map(Number);
+          if (tYear === selectedYear) {
+              names.add(t.name);
+          }
+      });
+      return Array.from(names).sort();
+  }, [essentialTransactions, selectedYear]);
 
   const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 
-  // Funzione che controlla lo stato (Fatto/Non Fatto) per una specifica ricorrenza in un specifico mese/anno
-  const checkStatus = (rec: RecurringTransaction, monthIndex: number, year: number) => {
-    const found = transactions.find(t => {
-        const d = new Date(t.occurred_on);
-        return d.getMonth() === monthIndex && 
-               d.getFullYear() === year && 
-               // Controllo un po' più lasso sull'importo: se c'è un movimento con lo stesso nome in quel mese, lo considero pagato, anche se l'importo differisce
-               (t.description === rec.name);
-    });
-    return !!found;
+  // Helper: Find specific EssentialTransaction for a cell (Name + Month + Year)
+  const getEssentialForCell = (name: string, monthIdx: number, year: number) => {
+      return essentialTransactions.find(t => {
+          const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
+          return t.name === name && tYear === year && (tMonth - 1) === monthIdx;
+      });
+  };
+
+  // Helper: Find Payment Transaction for a specific EssentialTransaction ID
+  const getPaymentForEssential = (essentialId: string) => {
+      return transactions.find(t => t.essential_transaction_id === essentialId);
   };
 
   const yearlyStats = useMemo(() => {
     let totalProjected = 0;
     let totalPaid = 0;
     
-    const activeRecs = sortedRecurrences.filter(r => r.is_active);
+    essentialTransactions.forEach(rec => {
+        const [tYear] = rec.occurred_on.split('-').map(Number);
+        if (tYear !== selectedYear) return;
 
-    activeRecs.forEach(rec => {
-        const isYearly = rec.frequency === 'yearly';
-        const multiplier = isYearly ? 1 : 12;
+        // Sum projected (Converted to CHF)
+        if (rec.is_active) {
+            const rate = rates[rec.currency_original] || 1;
+            totalProjected += (rec.amount_original * rate);
+        }
 
-        // Dato che non abbiamo un conto associato, assumiamo che amount_original sia un valore nominale (sommiamo come fossero CHF per la stima)
-        totalProjected += Math.abs(rec.amount_original) * multiplier;
-
-        const recMonth = new Date(rec.occurred_on).getMonth();
-        for(let i=0; i<12; i++) {
-            if(isYearly && i !== recMonth) continue;
-            
-            // Per il "Pagato", cerchiamo il movimento reale nel DB
-            const foundTx = transactions.find(t => {
-                const d = new Date(t.occurred_on);
-                return d.getMonth() === i && 
-                       d.getFullYear() === selectedYear && 
-                       (t.description === rec.name || t.description === rec.description);
-            });
-
-            if (foundTx) {
-                // Per il pagato usiamo la base convertita in CHF, dato che il movimento reale esiste
-                totalPaid += Math.abs(foundTx.amount_base || foundTx.amount_original);
-            }
+        // Sum paid (Use amount_base which is already CHF)
+        const tx = getPaymentForEssential(rec.id);
+        if (tx) {
+            totalPaid += (tx.amount_base || tx.amount_original);
         }
     });
 
-    return {
-        projected: totalProjected,
-        paid: totalPaid,
-        remaining: totalProjected - totalPaid // Qui è una stima: differenza tra previsto e pagato
-    };
-  }, [sortedRecurrences, transactions, selectedYear]);
+    return { projected: totalProjected, paid: totalPaid };
+  }, [essentialTransactions, transactions, selectedYear, rates]);
 
-  const handleGenerate = async (date: string, amount: number, accountId: string) => {
-    if (!genModal.recurrence) return;
-    const rec = genModal.recurrence;
-    
-    // Calcolo amount_base (CHF) se necessario
-    const account = accounts.find(a => a.id === accountId);
-    const currency = account?.currency_code || 'CHF';
-    
-    let amount_base = amount;
-    if (currency !== 'CHF') {
-        const rate = await fetchExchangeRate(date, currency, 'CHF');
-        amount_base = amount * rate;
-    }
+  const handleNewPayment = (rec: EssentialTransaction) => {
+      const defaultAccount = accounts.find(a => a.status === 'active' && !a.exclude_from_overview) || accounts[0];
 
-    await addTransaction({
-        occurred_on: date,
-        kind: rec.kind,
-        account_id: accountId,
-        amount_original: amount, // Uso l'importo inserito dall'utente (che può essere diverso dal template)
-        amount_base: amount_base,
-        category_id: rec.category_id,
-        tag: null, // Nessun tag dal template
-        description: rec.name,
-        user_id: rec.user_id
-    });
+      setPayModal({
+          open: true,
+          isEdit: false,
+          initialData: {
+              occurred_on: rec.occurred_on, // Usa la data esatta della voce essenziale
+              amount_original: Math.abs(rec.amount_original),
+              description: rec.description || '', // Usa la descrizione (Note) della voce
+              category_id: rec.category_id,
+              kind: rec.kind,
+              account_id: defaultAccount ? defaultAccount.id : '',
+              essential_transaction_id: rec.id,
+              tag: '' // Reset tag
+          }
+      });
   };
 
-  // Determina gli anni disponibili
+  const handleEditPayment = (transaction: Transaction) => {
+      setPayModal({
+          open: true,
+          isEdit: true,
+          initialData: {
+              ...transaction,
+              amount_original: Math.abs(transaction.amount_original),
+          }
+      });
+  };
+
+  const handleSaveTransaction = async (tx: Partial<Transaction>) => {
+      let finalAmount = tx.amount_original || 0;
+      
+      const expenseKinds = ['essential', 'personal', 'expense'];
+      if (expenseKinds.includes(tx.kind || '') && finalAmount > 0) {
+          finalAmount = -finalAmount;
+      }
+
+      let finalBase = tx.amount_base || 0;
+      if (expenseKinds.includes(tx.kind || '') && finalBase > 0) {
+          finalBase = -finalBase;
+      }
+
+      const payload = {
+          ...tx,
+          amount_original: finalAmount,
+          amount_base: finalBase
+      };
+
+      if (tx.id) {
+          await updateTransaction(tx.id, payload);
+      } else {
+          await addTransaction(payload);
+      }
+      setPayModal({ open: false, initialData: undefined });
+  };
+
   const availableYears = useMemo(() => {
     const current = new Date().getFullYear();
     return [current - 1, current, current + 1];
   }, []);
+
+  const headerInfoPayment = (
+      <div className="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span className="leading-tight">Conferma i dati per registrare il pagamento nei <strong>Movimenti</strong>.</span>
+      </div>
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -321,7 +311,7 @@ export const Recurrences: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end gap-6">
          <div className="flex items-center space-x-4">
             <div className="flex items-center gap-3">
-               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Ricorrenze</h2>
+               <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Spese Essenziali</h2>
                <button 
                   onClick={() => setIsInfoOpen(true)}
                   className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
@@ -346,205 +336,184 @@ export const Recurrences: React.FC = () => {
          </div>
          <button onClick={() => setModalState({ open: true })} className="px-6 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-            <span>NUOVA RICORRENZA</span>
+            <span>NUOVA VOCE</span>
          </button>
       </div>
 
-      {/* Cards Riepilogo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Annuo Previsto</span>
-            <div className="text-2xl font-black text-slate-900 mt-2">CHF {yearlyStats.projected.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+      {/* Stats Bar */}
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between">
+         <div className="flex flex-col mb-4 md:mb-0">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Pagato ({selectedYear})</span>
+            <div className={`text-3xl font-black mt-1 ${yearlyStats.paid >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>CHF {yearlyStats.paid.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
          </div>
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Già Pagato ({selectedYear})</span>
-            <div className="text-2xl font-black text-emerald-600 mt-2">CHF {yearlyStats.paid.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Residuo (Stima)</span>
-            <div className="text-2xl font-black text-rose-600 mt-2">CHF {yearlyStats.remaining.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
+         <div className="text-right max-w-md">
+             <p className="text-xs text-slate-400 leading-relaxed">
+                 Ogni riga raggruppa le spese con lo stesso nome. <br/>
+                 Ogni pallino è una voce a sé stante con il proprio importo e valuta.
+             </p>
          </div>
       </div>
 
       {/* VISTA DESKTOP: TABELLA MATRICE */}
       <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-8 py-6 bg-[#fcfdfe] border-b border-slate-100">
-             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Panoramica Mensile {selectedYear}</h3>
+             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Checklist {selectedYear}</h3>
         </div>
         <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+            <table className="w-max text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-100 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.05)]">Nome</th>
+                        <th className="px-4 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-100 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.05)] whitespace-nowrap">Nome Spesa</th>
                         {monthNames.map(m => (
-                            <th key={m} className="px-2 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center w-[6%]">{m}</th>
+                            <th key={m} className="px-2 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center min-w-[80px]">{m}</th>
                         ))}
-                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Azioni</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {sortedRecurrences.map(rec => {
-                        const recDay = new Date(rec.occurred_on).getDate();
-                        const recMonth = new Date(rec.occurred_on).getMonth();
-                        const isYearly = rec.frequency === 'yearly';
-
-                        return (
-                            <tr key={rec.id} className={`group transition-colors ${!rec.is_active ? 'bg-slate-50/30 opacity-60' : 'hover:bg-slate-50/50'}`}>
-                                <td className="px-6 py-4 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-100">
-                                    <div className="flex items-center space-x-2">
-                                       <div className="font-bold text-sm text-slate-800 truncate max-w-[150px]" title={rec.name}>{rec.name}</div>
-                                       {isYearly && <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[9px] font-bold uppercase border border-purple-100">1/Y</span>}
-                                    </div>
-                                    <div className="text-[10px] font-medium text-slate-400 uppercase mt-0.5">
-                                        Valore: {Math.abs(rec.amount_original).toLocaleString('it-IT')} • Giorno {recDay}
-                                    </div>
-                                </td>
-                                {monthNames.map((_, idx) => {
-                                    if (isYearly && idx !== recMonth) {
-                                        return <td key={idx} className="bg-slate-50/40 border-l border-r border-transparent"></td>;
-                                    }
-
-                                    const isDone = checkStatus(rec, idx, selectedYear);
-                                    const now = new Date();
-                                    const isPast = (selectedYear < now.getFullYear()) || (selectedYear === now.getFullYear() && idx < now.getMonth());
-                                    const isCurrent = selectedYear === now.getFullYear() && idx === now.getMonth();
-                                    const cellDate = new Date(selectedYear, idx, recDay + 1).toISOString().split('T')[0];
-
+                    {uniqueNames.map(recName => (
+                        <tr key={recName} className="group hover:bg-slate-50/30 transition-colors">
+                            <td className="px-4 py-4 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-100 whitespace-nowrap">
+                                <div className="font-black text-sm text-slate-800">{recName}</div>
+                            </td>
+                            {monthNames.map((_, idx) => {
+                                // Find specific entry for this cell
+                                const cellRec = getEssentialForCell(recName, idx, selectedYear);
+                                
+                                // Se non c'è voce prevista, cella vuota (o pulsante +)
+                                if (!cellRec) {
                                     return (
                                         <td key={idx} className="px-2 py-4 text-center">
-                                            {isDone ? (
-                                                <div className="w-6 h-6 mx-auto bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center cursor-default">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                                                </div>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => rec.is_active && setGenModal({ open: true, recurrence: rec, defaultDate: cellDate })}
-                                                    disabled={!rec.is_active}
-                                                    title={isPast ? "Scaduto - Clicca per generare" : "Clicca per generare"}
-                                                    className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center transition-all ${
-                                                        !rec.is_active ? 'bg-slate-100 border border-slate-200' :
-                                                        isPast ? 'bg-rose-50 border border-rose-200 text-rose-300 hover:bg-rose-500 hover:border-rose-500 hover:text-white' : 
-                                                        isCurrent ? 'bg-amber-50 border border-amber-200 text-amber-400 hover:bg-amber-400 hover:border-amber-400 hover:text-white animate-pulse' : 
-                                                        'bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50'
-                                                    }`}
-                                                >
-                                                    {!rec.is_active ? '' : <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60"></div>}
-                                                </button>
-                                            )}
+                                            {/* Optional: Add button to create entry for this slot */}
+                                            <div className="w-full h-8 flex items-center justify-center">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-100"></div>
+                                            </div>
                                         </td>
                                     );
-                                })}
-                                <td className="px-6 py-4 text-right space-x-1">
-                                    <button onClick={() => setModalState({ open: true, initialData: rec })} className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                                    <button onClick={() => setDeleteDialog({ open: true, rec })} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                                </td>
-                            </tr>
-                        );
-                    })}
+                                }
+
+                                const transaction = getPaymentForEssential(cellRec.id);
+                                const day = parseInt(cellRec.occurred_on.split('-')[2]);
+
+                                return (
+                                    <td key={idx} className="px-2 py-4 text-center">
+                                        <div className="flex flex-col items-center gap-1">
+                                            {transaction ? (
+                                                <button 
+                                                    onClick={() => handleEditPayment(transaction)}
+                                                    className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center cursor-pointer shadow-sm border border-emerald-200 hover:scale-110 transition-transform relative group/btn"
+                                                    title="Pagamento Registrato - Clicca per modificare"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => cellRec.is_active && handleNewPayment(cellRec)}
+                                                    disabled={!cellRec.is_active}
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all border-2 border-blue-200 bg-white text-blue-500 hover:bg-blue-50 hover:border-blue-300 relative group/btn"
+                                                    title="Registra Pagamento"
+                                                >
+                                                    <span className="text-[10px] font-black">{day}</span>
+                                                    
+                                                    {/* Quick Actions overlay on hover (Edit/Delete Rule) */}
+                                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover/btn:opacity-100 transition-opacity bg-white shadow-lg border border-slate-100 p-1 rounded-lg z-20 pointer-events-none group-hover/btn:pointer-events-auto">
+                                                        <div onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:text-blue-600 cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></div>
+                                                        <div onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:text-rose-600 cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div>
+                                                    </div>
+                                                </button>
+                                            )}
+                                            {/* Amount Label below dot */}
+                                            <div className="text-[8px] font-bold text-slate-400 whitespace-nowrap">
+                                                {cellRec.currency_original} {cellRec.amount_original.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                    {uniqueNames.length === 0 && (
+                        <tr>
+                            <td colSpan={13} className="py-12 text-center text-slate-400 text-sm">Nessuna voce essenziale trovata per questo anno.</td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
         </div>
       </div>
 
-      {/* VISTA MOBILE: CARDS */}
+      {/* VISTA MOBILE: LISTA RAGGRUPPATA */}
       <div className="md:hidden space-y-4">
-         {sortedRecurrences.map(rec => {
-            const recDay = new Date(rec.occurred_on).getDate();
-            const isYearly = rec.frequency === 'yearly';
-            const recMonth = new Date(rec.occurred_on).getMonth();
+         {uniqueNames.map(recName => (
+             <div key={recName} className="bg-white p-5 rounded-[1.5rem] shadow-sm border border-slate-100">
+                 <div className="font-black text-lg text-slate-900 mb-4 border-b border-slate-50 pb-2">{recName}</div>
+                 
+                 <div className="grid grid-cols-4 gap-3">
+                     {monthNames.map((m, idx) => {
+                         const cellRec = getEssentialForCell(recName, idx, selectedYear);
+                         if (!cellRec) return null;
 
-            return (
-              <div key={rec.id} className={`bg-white p-5 rounded-[1.5rem] shadow-sm border border-slate-100 ${!rec.is_active ? 'opacity-70' : ''}`}>
-                 <div className="flex justify-between items-start mb-3">
-                    <div>
-                        <div className="flex items-center space-x-2">
-                             <span className="font-bold text-slate-900">{rec.name}</span>
-                             {isYearly && <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 text-[9px] font-bold uppercase border border-purple-100">1/Y</span>}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase">Giorno {recDay} del mese</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                       <span className="font-black text-slate-900 text-lg">
-                           {Math.abs(rec.amount_original).toLocaleString('it-IT')}
-                       </span>
-                    </div>
-                 </div>
+                         const transaction = getPaymentForEssential(cellRec.id);
+                         const day = parseInt(cellRec.occurred_on.split('-')[2]);
 
-                 {/* Mini Timeline 12 mesi */}
-                 <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl mb-4 overflow-x-auto no-scrollbar">
-                    {monthNames.map((m, idx) => {
-                         // Se annuale e non è il mese giusto, mostra placeholder
-                         if (isYearly && idx !== recMonth) {
-                             return <div key={idx} className="w-2 h-2 rounded-full bg-slate-200 opacity-20 mx-1"></div>;
-                         }
-
-                         const isDone = checkStatus(rec, idx, selectedYear);
-                         const now = new Date();
-                         const isPast = (selectedYear < now.getFullYear()) || (selectedYear === now.getFullYear() && idx < now.getMonth());
-                         const isCurrent = selectedYear === now.getFullYear() && idx === now.getMonth();
-                         const cellDate = new Date(selectedYear, idx, recDay + 1).toISOString().split('T')[0];
-                         
                          return (
-                            <button
-                               key={idx}
-                               onClick={() => !isDone && rec.is_active && setGenModal({ open: true, recurrence: rec, defaultDate: cellDate })}
-                               disabled={isDone || !rec.is_active}
-                               className={`flex flex-col items-center min-w-[24px] gap-1 group`}
-                            >
-                                <div className={`w-3 h-3 rounded-full flex items-center justify-center transition-all ${
-                                    isDone ? 'bg-emerald-500' :
-                                    isCurrent ? 'bg-amber-400 ring-4 ring-amber-100 animate-pulse' :
-                                    isPast ? 'bg-rose-300' : 'bg-slate-200'
-                                }`}></div>
-                                <span className={`text-[8px] font-bold uppercase ${isCurrent ? 'text-slate-900' : 'text-slate-300'}`}>{m.charAt(0)}</span>
-                            </button>
+                             <div key={idx} className="flex flex-col items-center bg-slate-50 p-2 rounded-xl">
+                                 <span className="text-[9px] font-bold uppercase text-slate-400 mb-1">{m}</span>
+                                 {transaction ? (
+                                     <button 
+                                        onClick={() => handleEditPayment(transaction)}
+                                        className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-sm"
+                                     >
+                                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                     </button>
+                                 ) : (
+                                     <button 
+                                        onClick={() => cellRec.is_active && handleNewPayment(cellRec)}
+                                        className="w-8 h-8 bg-white border border-blue-200 text-blue-500 rounded-full flex items-center justify-center shadow-sm"
+                                     >
+                                         <span className="text-[10px] font-black">{day}</span>
+                                     </button>
+                                 )}
+                                 <div className="text-[9px] font-bold text-slate-500 mt-1">
+                                     {cellRec.amount_original.toLocaleString('it-IT', { maximumFractionDigits: 0 })}
+                                 </div>
+                                 
+                                 {!transaction && (
+                                     <button 
+                                        onClick={() => setModalState({ open: true, initialData: cellRec })}
+                                        className="mt-1 text-[8px] text-blue-400 underline"
+                                     >
+                                         Modifica
+                                     </button>
+                                 )}
+                             </div>
                          );
-                    })}
+                     })}
                  </div>
-
-                 <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                    <button 
-                        onClick={() => setModalState({ open: true, initialData: rec })}
-                        className="text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-wide"
-                    >
-                        Modifica
-                    </button>
-                    <button 
-                        onClick={() => setDeleteDialog({ open: true, rec })}
-                        className="text-xs font-bold text-rose-300 hover:text-rose-600 transition-colors uppercase tracking-wide"
-                    >
-                        Elimina
-                    </button>
-                 </div>
-              </div>
-            );
-         })}
-         
-         {sortedRecurrences.length === 0 && (
-            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-[1.5rem]">
-               <p className="text-slate-400 text-sm font-bold">Nessuna ricorrenza</p>
-            </div>
-         )}
+             </div>
+         ))}
       </div>
 
-      <RecurrenceModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateRecurring(r.id, r); else await addRecurring(r); }} initialData={modalState.initialData} categories={categories} />
+      <EssentialExpenseModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateEssential(r.id, r); else await addEssential(r); }} initialData={modalState.initialData} categories={categories} />
       
-      <ConfirmGenerationModal 
-        isOpen={genModal.open} 
-        onClose={() => setGenModal({ open: false, defaultDate: '' })} 
-        onConfirm={handleGenerate} 
-        recurrenceName={genModal.recurrence?.name || ''} 
-        defaultDate={genModal.defaultDate}
-        defaultAmount={genModal.recurrence?.amount_original || 0}
-        accounts={accounts}
+      {/* Modale Pagamento (TransactionModal) configurato specificamente */}
+      <TransactionModal 
+        isOpen={payModal.open} 
+        onClose={() => setPayModal({ open: false })} 
+        onSave={handleSaveTransaction} 
+        initialData={payModal.initialData} 
+        accounts={accounts} 
+        categories={categories}
+        customTitle={payModal.isEdit ? "Modifica Pagamento" : "Registra Pagamento"}
+        submitLabel={payModal.isEdit ? "AGGIORNA PAGAMENTO" : "EFFETTUA PAGAMENTO"}
+        headerInfo={headerInfoPayment}
       />
 
       <ConfirmModal 
         isOpen={deleteDialog.open} 
         onClose={() => setDeleteDialog({ open: false })} 
-        onConfirm={async () => { if(deleteDialog.rec) await deleteRecurring(deleteDialog.rec.id); setDeleteDialog({ open: false }); }}
-        title="Elimina Template"
-        message={`Eliminare "${deleteDialog.rec?.name}"? I movimenti già generati non verranno cancellati.`}
+        onConfirm={async () => { if(deleteDialog.rec) await deleteEssential(deleteDialog.rec.id); setDeleteDialog({ open: false }); }}
+        title="Elimina Voce"
+        message={`Eliminare "${deleteDialog.rec?.name}" del ${deleteDialog.rec?.occurred_on}?`}
         confirmText="Elimina"
         isDangerous={true}
       />
@@ -552,26 +521,26 @@ export const Recurrences: React.FC = () => {
       <FullScreenModal 
         isOpen={isInfoOpen} 
         onClose={() => setIsInfoOpen(false)} 
-        title="Gestione Ricorrenze"
+        title="Gestione Spese Essenziali"
         subtitle="Help"
       >
         <div className="space-y-6">
            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                  Le ricorrenze servono a pianificare spese fisse mensili (es. affitto, abbonamenti) e controllarne il pagamento.
+                  Questa sezione aggrega le spese per nome. Ogni pallino rappresenta una voce specifica nel database con il proprio importo e la propria valuta.
                </p>
            </div>
            
            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Come Funziona</h4>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Legenda</h4>
               <ul className="space-y-3">
                  <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Creazione Template:</span> Crea una ricorrenza definendo importo, giorno del mese e categoria. Non serve specificare il conto in questa fase.</p>
+                    <div className="w-8 h-8 rounded-full border-2 border-blue-200 flex items-center justify-center text-[10px] font-black text-blue-500 bg-white">15</div>
+                    <p className="text-sm text-slate-600 mt-1.5"><span className="font-bold text-slate-900">In Attesa:</span> Spesa prevista. Il numero indica il giorno del mese. Sotto trovi l'importo e la valuta specifici.</p>
                  </li>
                  <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600"><span className="font-bold text-slate-900">Generazione:</span> Ogni mese, clicca sul pallino corrispondente nella griglia. Si aprirà un popup dove potrai scegliere <strong>da quale conto</strong> effettuare il pagamento e confermare l'importo.</p>
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg></div>
+                    <p className="text-sm text-slate-600 mt-1.5"><span className="font-bold text-slate-900">Pagato:</span> Il movimento è stato registrato ed è visibile nella sezione Movimenti.</p>
                  </li>
               </ul>
            </div>

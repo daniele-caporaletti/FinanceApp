@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useFinance } from '../FinanceContext';
 import { Investment, InvestmentTrend } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -277,69 +277,6 @@ const getInvestmentStats = (trends: InvestmentTrend[], invId: string) => {
     };
 };
 
-// --- COMPONENT: CARD INVESTIMENTO ---
-interface InvestmentCardProps {
-  inv: Investment;
-  investmentTrends: InvestmentTrend[];
-  onSelect: (id: string) => void;
-  onEdit: (inv: Investment) => void;
-  onDelete: (inv: Investment) => void;
-}
-
-const InvestmentCard: React.FC<InvestmentCardProps> = ({ inv, investmentTrends, onSelect, onEdit, onDelete }) => {
-    const stats = getInvestmentStats(investmentTrends, inv.id);
-    
-    return (
-      <div 
-        onClick={() => onSelect(inv.id)}
-        className="bg-white rounded-[2rem] shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden h-full flex flex-col"
-      >
-        {/* Actions (Hidden by default) */}
-        <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-           <button onClick={(e) => { e.stopPropagation(); onEdit(inv); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-           <button onClick={(e) => { e.stopPropagation(); onDelete(inv); }} className="p-2 bg-white/90 rounded-xl shadow-sm text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-        </div>
-
-        <div className="p-6 pb-4 flex-1">
-            <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors truncate pr-12">{inv.name}</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded inline-block">{inv.currency} Asset</span>
-        </div>
-
-        {stats ? (
-            <div className="px-6 pb-6 space-y-4">
-                <div className="flex justify-between items-end border-b border-slate-50 pb-3">
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Attuale</span>
-                        <span className="text-xl font-black text-slate-900">{stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
-                        </span>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Versato</span>
-                        <span className="text-sm font-bold text-slate-600">{stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="text-right">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Profitto</span>
-                        <span className={`text-sm font-bold ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        ) : (
-            <div className="px-6 pb-6 flex-1 flex items-center justify-center">
-                <span className="text-xs text-slate-400 italic font-medium">Nessuna rilevazione</span>
-            </div>
-        )}
-      </div>
-    );
-};
-
 export const Investments: React.FC = () => {
   const { 
     investments, 
@@ -353,8 +290,25 @@ export const Investments: React.FC = () => {
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<Investment> }>({ open: false });
   const [trendModal, setTrendModal] = useState<{ open: boolean; initialData?: Partial<InvestmentTrend> }>({ open: false });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
-  
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; item?: Investment; isTrend?: boolean; trendId?: string }>({ open: false });
+
+  // Tassi di cambio per il calcolo totale
+  const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const [resEur, resUsd] = await Promise.all([
+          fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF'),
+          fetch('https://api.frankfurter.app/latest?from=USD&to=CHF')
+        ]);
+        const dataEur = await resEur.json();
+        const dataUsd = await resUsd.json();
+        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
+      } catch (error) { console.error("Rate fetch error", error); }
+    };
+    fetchRates();
+  }, []);
 
   const { retirement, personal } = useMemo(() => {
     return {
@@ -363,15 +317,16 @@ export const Investments: React.FC = () => {
     };
   }, [investments]);
 
-  const calculateGroupStats = (groupInvestments: Investment[]) => {
+  const calculateGroupStats = useCallback((groupInvestments: Investment[]) => {
     let totalValue = 0;
     let totalInvested = 0;
 
     groupInvestments.forEach(inv => {
       const stats = getInvestmentStats(investmentTrends, inv.id);
       if (stats) {
-        totalValue += stats.latestValue || 0;
-        totalInvested += stats.totalInvested;
+        const rate = rates[inv.currency] || 1;
+        totalValue += (stats.latestValue || 0) * rate;
+        totalInvested += stats.totalInvested * rate;
       }
     });
 
@@ -379,10 +334,10 @@ export const Investments: React.FC = () => {
     const roi = totalInvested !== 0 ? (netGain / totalInvested) * 100 : 0;
 
     return { totalValue, totalInvested, netGain, roi };
-  };
+  }, [investmentTrends, rates]); // Added rates dependency
 
-  const retirementStats = useMemo(() => calculateGroupStats(retirement), [retirement, investmentTrends]);
-  const personalStats = useMemo(() => calculateGroupStats(personal), [personal, investmentTrends]);
+  const retirementStats = useMemo(() => calculateGroupStats(retirement), [retirement, calculateGroupStats]);
+  const personalStats = useMemo(() => calculateGroupStats(personal), [personal, calculateGroupStats]);
 
   const processedTrends = useMemo(() => {
     if (!selectedInvestmentId) return [];
@@ -458,14 +413,6 @@ export const Investments: React.FC = () => {
       }
     }
     setDeleteDialog({ open: false });
-  };
-
-  const handleCardEdit = (inv: Investment) => {
-    setModalState({ open: true, initialData: inv });
-  };
-
-  const handleCardDelete = (inv: Investment) => {
-    setDeleteDialog({ open: true, item: inv, isTrend: false });
   };
 
   // --- VISTA DETTAGLIO ---
@@ -758,6 +705,7 @@ export const Investments: React.FC = () => {
     );
   }
 
+  // --- VISTA LISTA PRINCIPALE (MODIFICATA: LISTA INVECE DI CARD) ---
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
@@ -806,18 +754,86 @@ export const Investments: React.FC = () => {
              </div>
            )}
         </div>
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {retirement.map(inv => <InvestmentCard key={inv.id} inv={inv} investmentTrends={investmentTrends} onSelect={setSelectedInvestmentId} onEdit={handleCardEdit} onDelete={handleCardDelete} />)}
-            {retirement.length === 0 && (
-              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                 </div>
-                 <p className="text-slate-400 text-sm font-medium">Nessun fondo pensione configurato.</p>
-              </div>
+        
+        {/* TABELLA/LISTA INVESTIMENTI RETIREMENT */}
+        <div className="p-0">
+            {retirement.length > 0 ? (
+                <>
+                    {/* Desktop Table */}
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50 border-b border-slate-100">
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asset</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Valore Attuale</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Investito</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Profitto</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">ROI</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {retirement.map(inv => {
+                                    const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
+                                    return (
+                                        <tr key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="group hover:bg-slate-50 cursor-pointer transition-colors">
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm font-black text-slate-900">{inv.name}</div>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-1">{inv.currency}</span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right font-bold text-slate-900">
+                                                {stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-[10px] text-slate-400 font-normal">{inv.currency}</span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right text-xs font-mono text-slate-500">
+                                                {stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className={`px-8 py-5 text-right font-bold text-sm ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                    {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right space-x-1">
+                                                <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: inv }); }} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                                                <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, item: inv, isTrend: false }); }} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile List */}
+                    <div className="md:hidden divide-y divide-slate-50">
+                        {retirement.map(inv => {
+                            const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
+                            return (
+                                <div key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="p-5 active:bg-slate-50 transition-colors flex justify-between items-center">
+                                    <div>
+                                        <h4 className="font-bold text-slate-900 text-sm mb-1">{inv.name}</h4>
+                                        <div className="text-[10px] text-slate-400 font-medium uppercase">
+                                            Investito: {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })} {inv.currency}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-black text-slate-900 text-lg">
+                                            {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-medium">{inv.currency}</span>
+                                        </div>
+                                        <div className={`text-[10px] font-bold mt-0.5 ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}% ROI
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
+            ) : (
+                <div className="py-12 text-center text-slate-400 text-sm">Nessun fondo pensione configurato.</div>
             )}
-          </div>
         </div>
       </section>
 
@@ -853,18 +869,86 @@ export const Investments: React.FC = () => {
              </div>
            )}
         </div>
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {personal.map(inv => <InvestmentCard key={inv.id} inv={inv} investmentTrends={investmentTrends} onSelect={setSelectedInvestmentId} onEdit={handleCardEdit} onDelete={handleCardDelete} />)}
-            {personal.length === 0 && (
-              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                 </div>
-                 <p className="text-slate-400 text-sm font-medium">Nessun investimento personale configurato.</p>
-              </div>
+
+        {/* TABELLA/LISTA INVESTIMENTI PERSONALI */}
+        <div className="p-0">
+            {personal.length > 0 ? (
+                <>
+                    {/* Desktop Table */}
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50 border-b border-slate-100">
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asset</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Valore Attuale</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Investito</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Profitto</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">ROI</th>
+                                    <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {personal.map(inv => {
+                                    const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
+                                    return (
+                                        <tr key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="group hover:bg-slate-50 cursor-pointer transition-colors">
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm font-black text-slate-900">{inv.name}</div>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-1">{inv.currency}</span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right font-bold text-slate-900">
+                                                {stats.latestValue?.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-[10px] text-slate-400 font-normal">{inv.currency}</span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right text-xs font-mono text-slate-500">
+                                                {stats.totalInvested.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className={`px-8 py-5 text-right font-bold text-sm ${stats.netGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {stats.netGain > 0 ? '+' : ''}{stats.netGain.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${stats.roi >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                    {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right space-x-1">
+                                                <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: inv }); }} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                                                <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, item: inv, isTrend: false }); }} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile List */}
+                    <div className="md:hidden divide-y divide-slate-50">
+                        {personal.map(inv => {
+                            const stats = getInvestmentStats(investmentTrends, inv.id) || { latestValue: 0, totalInvested: 0, netGain: 0, roi: 0 };
+                            return (
+                                <div key={inv.id} onClick={() => setSelectedInvestmentId(inv.id)} className="p-5 active:bg-slate-50 transition-colors flex justify-between items-center">
+                                    <div>
+                                        <h4 className="font-bold text-slate-900 text-sm mb-1">{inv.name}</h4>
+                                        <div className="text-[10px] text-slate-400 font-medium uppercase">
+                                            Investito: {stats.totalInvested.toLocaleString('it-IT', { maximumFractionDigits: 0 })} {inv.currency}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-black text-slate-900 text-lg">
+                                            {stats.latestValue?.toLocaleString('it-IT', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-medium">{inv.currency}</span>
+                                        </div>
+                                        <div className={`text-[10px] font-bold mt-0.5 ${stats.roi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}% ROI
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
+            ) : (
+                <div className="py-12 text-center text-slate-400 text-sm">Nessun investimento personale configurato.</div>
             )}
-          </div>
         </div>
       </section>
 
@@ -918,7 +1002,7 @@ export const Investments: React.FC = () => {
                     <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
                     <div className="text-sm text-slate-600">
                        <span className="font-bold text-slate-900 block mb-0.5">Aggiungi Rilevazioni (Update)</span>
-                       Periodicamente (es. ogni mese), clicca sulla card e aggiungi una nuova "Rilevazione". Inserisci il <span className="font-bold">Valore Totale Attuale</span> del portafoglio e il <span className="font-bold">Cash Flow</span> (quanto hai versato di tasca tua in quel periodo).
+                       Periodicamente (es. ogni mese), clicca sulla riga dell'investimento e aggiungi una nuova "Rilevazione". Inserisci il <span className="font-bold">Valore Totale Attuale</span> del portafoglio e il <span className="font-bold">Cash Flow</span> (quanto hai versato di tasca tua in quel periodo).
                     </div>
                  </div>
               </div>

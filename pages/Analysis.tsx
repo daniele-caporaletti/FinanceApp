@@ -37,9 +37,9 @@ export const Analysis: React.FC = () => {
       // Exclude logic
       if (t.kind === 'work' || t.kind === 'transfer') return false;
 
-      const d = new Date(t.occurred_on);
-      const yearMatch = d.getFullYear() === selectedYear;
-      const monthMatch = selectedMonth === 'all' || d.getMonth() === selectedMonth;
+      const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
+      const yearMatch = tYear === selectedYear;
+      const monthMatch = selectedMonth === 'all' || (tMonth - 1) === selectedMonth;
 
       return yearMatch && monthMatch;
     });
@@ -47,7 +47,7 @@ export const Analysis: React.FC = () => {
 
   // 2. Available Years
   const availableYears = useMemo(() => {
-    const years = transactions.map(t => new Date(t.occurred_on).getFullYear());
+    const years = transactions.map(t => parseInt(t.occurred_on.split('-')[0]));
     const unique = Array.from(new Set(years));
     if (!unique.includes(currentYear)) unique.push(currentYear);
     return unique.sort((a: number, b: number) => b - a);
@@ -84,9 +84,10 @@ export const Analysis: React.FC = () => {
 
     transactions.filter(t => {
         if (t.kind === 'work' || t.kind === 'transfer') return false;
-        return new Date(t.occurred_on).getFullYear() === selectedYear;
+        return parseInt(t.occurred_on.split('-')[0]) === selectedYear;
     }).forEach(t => {
-        const monthIdx = new Date(t.occurred_on).getMonth();
+        const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
+        const monthIdx = tMonth - 1;
         const amt = t.amount_base || 0;
         if (amt > 0) data[monthIdx].Income += amt;
         else data[monthIdx].Expense += Math.abs(amt);
