@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
@@ -30,6 +29,7 @@ export interface TransactionModalProps {
   customTitle?: string;
   submitLabel?: string;
   headerInfo?: React.ReactNode;
+  disableTypeSelection?: boolean;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
@@ -41,15 +41,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   categories,
   customTitle,
   submitLabel = "Salva",
-  headerInfo
+  headerInfo,
+  disableTypeSelection = false
 }) => {
   const [formData, setFormData] = useState<Partial<Transaction>>({});
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string>('');
 
-  // Filtra i conti attivi e visibili in overview
+  // MODIFICATO: Filtra SOLTANTO per status attivo, ignorando exclude_from_overview
   const visibleAccounts = useMemo(() => {
-    return accounts.filter(a => a.status === 'active' && !a.exclude_from_overview);
+    return accounts.filter(a => a.status === 'active');
   }, [accounts]);
 
   // Options prep
@@ -128,8 +129,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center">
+      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-visible animate-in zoom-in-95 duration-300">
+        <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center rounded-t-[2.5rem]">
           <div>
             <h2 className="text-xl font-black text-slate-900">{customTitle || (initialData?.id ? 'Modifica Movimento' : 'Nuovo Movimento')}</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gestione Transazione</p>
@@ -145,10 +146,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-10 space-y-6">
+        <form onSubmit={handleSubmit} className="p-10 space-y-6 bg-white rounded-b-[2.5rem]">
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /></div>
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} disabled={disableTypeSelection} /></div>
           </div>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5">
@@ -221,23 +222,41 @@ export const Transactions: React.FC = () => {
     return unique.sort((a: number, b: number) => b - a).map(String);
   }, [transactions, currentYear]);
 
-  const getCategoryInfo = (id: string | null) => {
-    if (!id) return { category: '-', subcategory: '-', categoryId: null };
-    const cat = categories.find(c => c.id === id);
-    if (!cat) return { category: '-', subcategory: '-', categoryId: null };
-    const parent = cat.parent_id ? categories.find(p => p.id === cat.parent_id) : null;
-    return { category: parent ? parent.name : cat.name, subcategory: parent ? cat.name : '-', categoryId: parent?.id || cat.id };
+  // OPTIMIZATION: Create Lookup Maps O(C) + O(A) to avoid finding in array for every row
+  const categoryMap = useMemo(() => {
+      const map = new Map<string, {category: string, subcategory: string, categoryId: string | null}>();
+      categories.forEach(c => {
+          if (c.parent_id) {
+              const p = categories.find(x => x.id === c.parent_id);
+              map.set(c.id, { category: p ? p.name : c.name, subcategory: c.name, categoryId: p ? p.id : c.id });
+          } else {
+              map.set(c.id, { category: c.name, subcategory: '-', categoryId: c.id });
+          }
+      });
+      return map;
+  }, [categories]);
+
+  const accountMap = useMemo(() => {
+      const map = new Map<string, {name: string, currency: string}>();
+      accounts.forEach(a => {
+          map.set(a.id, { name: a.name, currency: a.currency_code });
+      });
+      return map;
+  }, [accounts]);
+
+  const getCategoryInfoFromMap = (id: string | null) => {
+      if (!id) return { category: '-', subcategory: '-', categoryId: null };
+      return categoryMap.get(id) || { category: '-', subcategory: '-', categoryId: null };
   };
 
-  const getAccountInfo = (id: string) => {
-    const a = accounts.find(ac => ac.id === id);
-    return a ? { name: a.name, currency: a.currency_code } : { name: '?', currency: '' };
+  const getAccountInfoFromMap = (id: string) => {
+      return accountMap.get(id) || { name: '?', currency: '' };
   };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      const { category, subcategory } = getCategoryInfo(tx.category_id);
-      const acc = getAccountInfo(tx.account_id);
+      const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
+      const acc = getAccountInfoFromMap(tx.account_id);
       const [tYear, tMonth] = tx.occurred_on.split('-').map(Number);
       
       const matchSearch = !filters.search || 
@@ -259,7 +278,7 @@ export const Transactions: React.FC = () => {
 
       return matchSearch && matchType && matchAccount && matchCategory && matchSub && matchTag && matchYear && matchMonth && matchSign;
     }).sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime());
-  }, [transactions, filters, categories, accounts]);
+  }, [transactions, filters, categoryMap, accountMap]);
 
   const typeOptions = ['essential', 'personal', 'work', 'transfer'];
   const accountOptions = Array.from(new Set(accounts.filter(a => a.status === 'active').map(a => a.name)));
@@ -359,8 +378,8 @@ export const Transactions: React.FC = () => {
       )}
 
       {/* ... TABELLA E CARDS ... */}
-      <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden relative z-10">
-         <div className="overflow-x-auto custom-scrollbar">
+      <div className="hidden md:block bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-visible relative z-10">
+         <div className="overflow-x-auto custom-scrollbar overflow-visible">
             <table className="w-full text-left border-collapse min-w-[1100px]">
                 <thead>
                     <tr className="bg-[#fcfdfe] border-b border-slate-100">
@@ -375,8 +394,8 @@ export const Transactions: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {filteredTransactions.map(tx => {
-                        const { category, subcategory } = getCategoryInfo(tx.category_id);
-                        const acc = getAccountInfo(tx.account_id);
+                        const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
+                        const acc = getAccountInfoFromMap(tx.account_id);
                         const isTransfer = tx.kind === 'transfer';
                         const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
                         const isSameCurrency = acc.currency === 'CHF';
@@ -428,8 +447,8 @@ export const Transactions: React.FC = () => {
 
       <div className="md:hidden space-y-3 relative z-10">
          {filteredTransactions.map(tx => {
-            const { category, subcategory } = getCategoryInfo(tx.category_id);
-            const acc = getAccountInfo(tx.account_id);
+            const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
+            const acc = getAccountInfoFromMap(tx.account_id);
             const isTransfer = tx.kind === 'transfer';
             const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
             
