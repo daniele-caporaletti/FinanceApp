@@ -34,7 +34,7 @@ export interface EssentialTransaction {
   id: string;
   user_id: string;
   name: string;
-  is_active: boolean;
+  is_ready: boolean; // Renamed from is_active
   occurred_on: string; 
   kind: 'income' | 'expense' | 'transfer' | string;
   amount_original: number;
