@@ -249,7 +249,8 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
 // --- COMPONENTE PRINCIPALE ---
 export const Recurrences: React.FC = () => {
   const { essentialTransactions, transactions, accounts, categories, addEssential, updateEssential, deleteEssential, addTransaction, updateTransaction } = useFinance();
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const currentRealDate = new Date();
+  const [selectedYear, setSelectedYear] = useState<number>(currentRealDate.getFullYear());
   
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<EssentialTransaction> }>({ open: false });
   const [payModal, setPayModal] = useState<{ open: boolean; initialData?: Partial<Transaction>; isEdit?: boolean }>({ open: false });
@@ -257,7 +258,8 @@ export const Recurrences: React.FC = () => {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; rec?: EssentialTransaction }>({ open: false });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
-  const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+  const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  const shortMonthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 
   // --- OPTIMIZATION START: PRE-CALCULATED LOOKUP MAPS ---
   
@@ -416,111 +418,70 @@ export const Recurrences: React.FC = () => {
     return years.map(y => ({ value: y, label: y.toString() }));
   }, []);
 
-  const renderTable = (title: string, names: string[], lookupMap: Map<string, EssentialTransaction>, colorTheme: 'rose' | 'blue') => {
+  const renderUnifiedTable = () => {
       
-      const monthlyTotals = monthNames.map((_, idx) => {
-          return names.reduce((sum, name) => {
-              const cellRec = getEssentialFromMap(lookupMap, name, idx);
-              if (cellRec) {
-                  return sum + Math.abs(cellRec.amount_original);
-              }
-              return sum;
+      // Calcola i totali mensili sommando sia Spese che Giroconti
+      const monthlyTotals = shortMonthNames.map((_, idx) => {
+          const expenseSum = uniqueExpenseNames.reduce((sum, name) => {
+              const cellRec = getEssentialFromMap(expensesLookup, name, idx);
+              return cellRec ? sum + Math.abs(cellRec.amount_original) : sum;
           }, 0);
+          
+          const transferSum = uniqueTransferNames.reduce((sum, name) => {
+              const cellRec = getEssentialFromMap(transfersLookup, name, idx);
+              return cellRec ? sum + Math.abs(cellRec.amount_original) : sum;
+          }, 0);
+
+          return expenseSum + transferSum;
       });
 
       return (
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden flex flex-col mb-8 w-full">
         <div className="flex-none px-8 py-3 border-b border-slate-100 flex items-center gap-3 bg-white z-30">
-            <div className={`w-1.5 h-6 rounded-full ${colorTheme === 'rose' ? 'bg-rose-500' : 'bg-blue-600'}`}></div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">{title}</h3>
+            <div className="w-1.5 h-6 rounded-full bg-slate-800"></div>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Pianificazione Annuale</h3>
         </div>
         
-        {/* UNIFIED SCROLL CONTAINER */}
         <div className="flex-1 overflow-x-auto md:overflow-x-visible custom-scrollbar relative bg-white w-full">
             <div className="min-w-max md:min-w-full md:w-full">
                 
-                {/* Header Grid: Flex on Mobile, Grid on Desktop */}
+                {/* Header Grid: Months */}
                 <div className="sticky top-0 z-20 flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 shadow-sm w-full">
                     <div className="sticky left-0 z-30 w-[130px] md:w-auto p-4 font-black text-[10px] text-slate-400 uppercase tracking-widest bg-slate-50/95 backdrop-blur-sm border-r border-slate-200 md:border-r-0 flex items-center">
-                        Voce
+                        Periodo
                     </div>
-                    {monthNames.map(m => (
-                        <div key={m} className="w-[80px] md:w-auto flex-shrink-0 flex items-center justify-center p-2 text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                            {m.substring(0,3)}
-                        </div>
-                    ))}
+                    {shortMonthNames.map((m, idx) => {
+                        const isCurrentMonth = idx === currentRealDate.getMonth() && selectedYear === currentRealDate.getFullYear();
+                        return (
+                            <div key={m} className={`w-[80px] md:w-auto flex-shrink-0 flex items-center justify-center p-2 text-[9px] font-black uppercase tracking-wider ${isCurrentMonth ? 'text-blue-600 bg-blue-50/50' : 'text-slate-400'}`}>
+                                {m}
+                            </div>
+                        );
+                    })}
                 </div>
 
-                {/* Rows Grid */}
+                {/* --- SEZIONE SPESE ESSENZIALI --- */}
+                <div className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-rose-50/30 border-b border-rose-100 w-full sticky left-0 z-10">
+                    <div className="sticky left-0 z-10 w-[130px] md:w-[140px] p-3 pl-4 bg-rose-50/95 backdrop-blur-sm border-r border-rose-100 md:border-r-0 font-black text-[10px] text-rose-500 uppercase tracking-widest flex items-center">
+                        Spese Essenziali
+                    </div>
+                    {/* Filler cells for section header to maintain grid structure visually if needed, or just let it span */}
+                    <div className="flex-1 md:col-span-12"></div>
+                </div>
+
                 <div className="divide-y divide-slate-50">
-                    {names.map((recName) => (
+                    {uniqueExpenseNames.map((recName) => (
                         <div key={recName} className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
-                            <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center">
+                            <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center border-l-4 border-l-transparent group-hover:border-l-rose-400">
                                 <span className="font-bold text-xs text-slate-800 truncate" title={recName}>{recName}</span>
                             </div>
                             
-                            {/* Cells Row */}
-                            {monthNames.map((_, idx) => {
-                                const cellRec = getEssentialFromMap(lookupMap, recName, idx);
-                                
+                            {shortMonthNames.map((_, idx) => {
+                                const cellRec = getEssentialFromMap(expensesLookup, recName, idx);
+                                const isCurrentMonth = idx === currentRealDate.getMonth() && selectedYear === currentRealDate.getFullYear();
                                 return (
-                                    <div key={idx} className="w-[80px] md:w-auto flex-shrink-0 h-[44px] flex items-center justify-center relative group/cell">
-                                        {cellRec ? (() => {
-                                            const transaction = getPaymentFromMap(cellRec.id, cellRec.kind);
-                                            const rawAmount = transaction ? (transaction.amount_original || 0) : cellRec.amount_original;
-                                            const formattedAmount = Math.abs(rawAmount).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                            const currency = cellRec.currency_original || 'CHF';
-                                            const isOverdue = !transaction && new Date(cellRec.occurred_on) < new Date();
-                                            const isReady = cellRec.is_ready;
-
-                                            let buttonContent;
-                                            if (transaction) {
-                                                buttonContent = (
-                                                    <button onClick={() => handleEditPayment(transaction)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 flex flex-col items-center justify-center shadow-sm active:scale-95 transition-transform">
-                                                        <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
-                                                        <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
-                                                    </button>
-                                                );
-                                            } else if (cellRec.kind === 'transfer') {
-                                                buttonContent = (
-                                                    <button 
-                                                        onClick={() => handleNewPayment(cellRec)}
-                                                        className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-amber-200 text-amber-600 bg-amber-50/30'}`}
-                                                    >
-                                                        <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
-                                                        <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
-                                                    </button>
-                                                );
-                                            } else if (cellRec.kind === 'essential' && !isReady) {
-                                                buttonContent = (
-                                                    <button onClick={() => handlePreparation(cellRec)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 flex flex-col items-center justify-center active:scale-95 transition-transform relative">
-                                                        <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
-                                                        <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
-                                                    </button>
-                                                );
-                                            } else {
-                                                buttonContent = (
-                                                    <button onClick={() => handleNewPayment(cellRec)} className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-blue-200 text-blue-500 bg-blue-50/30'}`}>
-                                                        <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
-                                                        <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
-                                                    </button>
-                                                );
-                                            }
-
-                                            return (
-                                                <>
-                                                    {buttonContent}
-                                                    {!transaction && (
-                                                        <div className="hidden group-hover/cell:flex absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-100 rounded-lg p-1 gap-1 z-50">
-                                                            <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            );
-                                        })() : (
-                                            <div className="w-1 h-1 rounded-full bg-slate-100"></div>
-                                        )}
+                                    <div key={idx} className={`w-[80px] md:w-auto flex-shrink-0 h-[44px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}>
+                                        {cellRec ? renderCellContent(cellRec) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
                                     </div>
                                 );
                             })}
@@ -528,7 +489,35 @@ export const Recurrences: React.FC = () => {
                     ))}
                 </div>
 
-                {/* Footer Grid */}
+                {/* --- SEZIONE GIROCONTI --- */}
+                <div className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-blue-50/30 border-y border-blue-100 w-full sticky left-0 z-10 mt-1">
+                    <div className="sticky left-0 z-10 w-[130px] md:w-[140px] p-3 pl-4 bg-blue-50/95 backdrop-blur-sm border-r border-blue-100 md:border-r-0 font-black text-[10px] text-blue-500 uppercase tracking-widest flex items-center">
+                        Giroconti
+                    </div>
+                    <div className="flex-1 md:col-span-12"></div>
+                </div>
+
+                <div className="divide-y divide-slate-50">
+                    {uniqueTransferNames.map((recName) => (
+                        <div key={recName} className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
+                            <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center border-l-4 border-l-transparent group-hover:border-l-blue-400">
+                                <span className="font-bold text-xs text-slate-800 truncate" title={recName}>{recName}</span>
+                            </div>
+                            
+                            {shortMonthNames.map((_, idx) => {
+                                const cellRec = getEssentialFromMap(transfersLookup, recName, idx);
+                                const isCurrentMonth = idx === currentRealDate.getMonth() && selectedYear === currentRealDate.getFullYear();
+                                return (
+                                    <div key={idx} className={`w-[80px] md:w-auto flex-shrink-0 h-[44px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}>
+                                        {cellRec ? renderCellContent(cellRec) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Footer Totals */}
                 <div className="sticky bottom-0 z-20 flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-slate-50 border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full">
                     <div className="sticky left-0 z-30 w-[130px] md:w-auto p-4 font-black text-[10px] text-slate-500 uppercase tracking-widest bg-slate-50 border-r border-slate-200 md:border-r-0 flex items-center">
                         Totale
@@ -544,6 +533,61 @@ export const Recurrences: React.FC = () => {
         </div>
       </div>
   )};
+
+  const renderCellContent = (cellRec: EssentialTransaction) => {
+      const transaction = getPaymentFromMap(cellRec.id, cellRec.kind);
+      const rawAmount = transaction ? (transaction.amount_original || 0) : cellRec.amount_original;
+      const formattedAmount = Math.abs(rawAmount).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const currency = cellRec.currency_original || 'CHF';
+      const isOverdue = !transaction && new Date(cellRec.occurred_on) < new Date();
+      const isReady = cellRec.is_ready;
+
+      let buttonContent;
+      if (transaction) {
+          buttonContent = (
+              <button onClick={() => handleEditPayment(transaction)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 flex flex-col items-center justify-center shadow-sm active:scale-95 transition-transform">
+                  <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
+                  <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
+              </button>
+          );
+      } else if (cellRec.kind === 'transfer') {
+          buttonContent = (
+              <button 
+                  onClick={() => handleNewPayment(cellRec)}
+                  className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-amber-200 text-amber-600 bg-amber-50/30'}`}
+              >
+                  <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
+                  <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
+              </button>
+          );
+      } else if (cellRec.kind === 'essential' && !isReady) {
+          buttonContent = (
+              <button onClick={() => handlePreparation(cellRec)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 flex flex-col items-center justify-center active:scale-95 transition-transform relative">
+                  <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
+                  <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
+              </button>
+          );
+      } else {
+          buttonContent = (
+              <button onClick={() => handleNewPayment(cellRec)} className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-blue-200 text-blue-500 bg-blue-50/30'}`}>
+                  <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
+                  <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
+              </button>
+          );
+      }
+
+      return (
+          <>
+              {buttonContent}
+              {!transaction && (
+                  <div className="hidden group-hover/cell:flex absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-100 rounded-lg p-1 gap-1 z-50 animate-in zoom-in duration-200">
+                      <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                  </div>
+              )}
+          </>
+      );
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-28">
@@ -562,8 +606,8 @@ export const Recurrences: React.FC = () => {
 
          {/* Controls Section */}
          <div className="flex items-stretch md:items-center gap-3 w-full md:w-auto">
-            {/* Year Selector Dropdown */}
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm min-w-[120px] flex items-center">
+            {/* Year Selector */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm min-w-[100px] flex items-center">
                 <CustomSelect 
                     value={selectedYear} 
                     onChange={(val) => setSelectedYear(Number(val))} 
@@ -584,11 +628,8 @@ export const Recurrences: React.FC = () => {
          </div>
       </div>
 
-      {/* TABLE 1: Essential Expenses */}
-      {renderTable('Spese Essenziali', uniqueExpenseNames, expensesLookup, 'rose')}
-
-      {/* TABLE 2: Transfers (Renamed to Giroconti) */}
-      {renderTable('Giroconti', uniqueTransferNames, transfersLookup, 'blue')}
+      {/* SINGLE UNIFIED TABLE */}
+      {renderUnifiedTable()}
 
       <EssentialExpenseModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (r) => { if(r.id) await updateEssential(r.id, r); else await addEssential(r); }} initialData={modalState.initialData} categories={categories} />
       
@@ -638,21 +679,15 @@ export const Recurrences: React.FC = () => {
            </div>
            
            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Legenda Spese Essenziali</h4>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Utilizzo</h4>
               <ul className="space-y-3">
-                 <li className="flex items-center gap-3">
-                    <div className="w-auto px-2 h-6 rounded bg-emerald-100 border border-emerald-200 text-emerald-700 flex items-center justify-center text-[10px] font-bold">120</div>
-                    <span className="text-sm text-slate-600 font-bold">Pagato (Spesa Registrata)</span>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Le spese essenziali sono raggruppate per mese. Clicca sui pallini per registrare il pagamento.</p>
                  </li>
-                 <li className="flex items-center gap-3">
-                    <div className="w-auto px-2 h-6 rounded border-2 border-blue-200 text-blue-500 bg-blue-50/30 flex items-center justify-center text-[10px] font-bold relative">
-                        120
-                    </div>
-                    <span className="text-sm text-slate-600 font-bold">Pronto (Fondi Accantonati)</span>
-                 </li>
-                 <li className="flex items-center gap-3">
-                    <div className="w-auto px-2 h-6 rounded bg-amber-50 border border-amber-300 text-amber-700 flex items-center justify-center text-[10px] font-bold">120</div>
-                    <span className="text-sm text-slate-600 font-bold">Da Accantonare</span>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Il mese corrente viene evidenziato in tabella per facilitare la lettura.</p>
                  </li>
               </ul>
            </div>

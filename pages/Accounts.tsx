@@ -229,7 +229,7 @@ export const Accounts: React.FC = () => {
   }, []);
 
   const calculateBalance = (accountId: string) => {
-    return transactions
+    const balance = transactions
       .filter(t => t.account_id === accountId)
       .reduce((sum, t) => {
         const amount = t.amount_original || 0;
@@ -237,6 +237,10 @@ export const Accounts: React.FC = () => {
         if (t.kind === 'income') return sum + Math.abs(amount);
         return sum + amount;
       }, 0);
+    
+    // Arrotondamento e normalizzazione dello zero (evita -0.00)
+    const rounded = Math.round(balance * 100) / 100;
+    return rounded === 0 ? 0 : rounded;
   };
 
   const activeAccounts = useMemo(() => accounts.filter(a => a.status === 'active'), [accounts]);
@@ -252,7 +256,16 @@ export const Accounts: React.FC = () => {
 
   const displayedAccounts = useMemo(() => {
     const list = showInactive ? [...activeAccounts, ...inactiveAccounts] : activeAccounts;
-    return list.sort((a, b) => a.name.localeCompare(b.name));
+    
+    return list.sort((a, b) => {
+        // 1. Ordina per visibilità in Overview (In overview = exclude_from_overview false)
+        // False (visibile) deve venire PRIMA di True (nascosto)
+        if (a.exclude_from_overview !== b.exclude_from_overview) {
+            return a.exclude_from_overview ? 1 : -1;
+        }
+        // 2. Ordine alfabetico secondario
+        return a.name.localeCompare(b.name);
+    });
   }, [activeAccounts, inactiveAccounts, showInactive]);
 
   const handleSaveAccount = async (payload: Partial<Account>) => {

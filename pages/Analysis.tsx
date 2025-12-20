@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useFinance } from '../FinanceContext';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
@@ -10,17 +9,51 @@ import { FullScreenModal } from '../components/FullScreenModal';
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
 export const Analysis: React.FC = () => {
-  const { transactions, categories } = useFinance();
+  const { transactions, categories, accounts, investments, investmentTrends } = useFinance();
   const currentYear = new Date().getFullYear();
   
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all');
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   
+  // Tassi di cambio per il calcolo del patrimonio (Storici)
+  const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+
   // Stato per gestire l'espansione delle sottocategorie nel dettaglio
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
 
   const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      let dateStr = '';
+      const today = new Date().toISOString().split('T')[0];
+
+      if (selectedMonth === 'all') {
+          dateStr = `${selectedYear}-12-31`;
+      } else {
+          const lastDay = new Date(selectedYear, selectedMonth + 1, 0); 
+          const y = lastDay.getFullYear();
+          const m = String(lastDay.getMonth() + 1).padStart(2, '0');
+          const d = String(lastDay.getDate()).padStart(2, '0');
+          dateStr = `${y}-${m}-${d}`;
+      }
+
+      // Usa 'latest' se la data è futura
+      const queryDate = dateStr > today ? 'latest' : dateStr;
+
+      try {
+        const [resEur, resUsd] = await Promise.all([
+          fetch(`https://api.frankfurter.app/${queryDate}?from=EUR&to=CHF`),
+          fetch(`https://api.frankfurter.app/${queryDate}?from=USD&to=CHF`)
+        ]);
+        const dataEur = await resEur.json();
+        const dataUsd = await resUsd.json();
+        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
+      } catch (error) { console.error("Rate fetch error", error); }
+    };
+    fetchRates();
+  }, [selectedYear, selectedMonth]);
 
   const toggleDetail = (categoryName: string) => {
     setExpandedDetails(prev => {
@@ -30,6 +63,69 @@ export const Analysis: React.FC = () => {
         return next;
     });
   };
+
+  // 0. Calcolo Patrimonio Storico (Liquidità + Investimenti Personali)
+  const historicWealth = useMemo(() => {
+      // Determina la data di taglio (cutoff)
+      let cutoffDateStr = '';
+      let displayDateLabel = '';
+
+      if (selectedMonth === 'all') {
+          cutoffDateStr = `${selectedYear}-12-31`;
+          displayDateLabel = `31 Dicembre ${selectedYear}`;
+      } else {
+          const lastDay = new Date(selectedYear, selectedMonth + 1, 0); 
+          const y = lastDay.getFullYear();
+          const m = String(lastDay.getMonth() + 1).padStart(2, '0');
+          const d = String(lastDay.getDate()).padStart(2, '0');
+          cutoffDateStr = `${y}-${m}-${d}`;
+          displayDateLabel = `${d} ${monthNames[selectedMonth]} ${selectedYear}`;
+      }
+
+      // A. LIQUIDITA (Somma transazioni)
+      const accountBalances: Record<string, number> = {};
+      transactions.forEach(t => {
+          if (t.occurred_on <= cutoffDateStr) {
+              const amount = t.amount_original || 0;
+              accountBalances[t.account_id] = (accountBalances[t.account_id] || 0) + amount;
+          }
+      });
+
+      let liquidityCHF = 0;
+      accounts.forEach(acc => {
+          const balance = accountBalances[acc.id] || 0;
+          const rate = rates[acc.currency_code] || 1;
+          liquidityCHF += balance * rate;
+      });
+
+      // B. INVESTIMENTI PERSONALI (Valore storico)
+      let investmentsCHF = 0;
+      // Filtra solo investimenti personali (non pensione)
+      const personalInvestments = investments.filter(inv => !inv.is_for_retirement);
+      
+      personalInvestments.forEach(inv => {
+          // Trova tutti i trend per questo investimento
+          const trends = investmentTrends.filter(t => t.investment_id === inv.id);
+          
+          // Trova il trend più recente valido (<= cutoffDate)
+          // Ordiniamo per data decrescente e prendiamo il primo che soddisfa la condizione
+          const validTrend = trends
+              .filter(t => t.value_on <= cutoffDateStr)
+              .sort((a, b) => new Date(b.value_on).getTime() - new Date(a.value_on).getTime())[0];
+
+          if (validTrend) {
+              const rate = rates[inv.currency] || 1;
+              investmentsCHF += (validTrend.value_original || 0) * rate;
+          }
+      });
+
+      return { 
+          total: liquidityCHF + investmentsCHF, 
+          liquidity: liquidityCHF,
+          investments: investmentsCHF,
+          dateLabel: displayDateLabel 
+      };
+  }, [transactions, accounts, investments, investmentTrends, rates, selectedYear, selectedMonth]);
 
   // 1. Data Filtering (Core Logic: No Work, No Transfer)
   const filteredTransactions = useMemo(() => {
@@ -213,7 +309,7 @@ export const Analysis: React.FC = () => {
            </button>
       </div>
 
-      {/* Controls Bar */}
+      {/* Controls Bar (Spostato SOPRA) */}
       <div className="bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm w-full">
          <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
             {/* Year Selector Wrapper */}
@@ -252,6 +348,28 @@ export const Analysis: React.FC = () => {
                 </div>
             </div>
          </div>
+      </div>
+
+      {/* --- HISTORIC WEALTH CARD (Spostato SOTTO) --- */}
+      <div className="w-full bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl shadow-slate-200 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+          
+          <div className="flex items-center gap-4 relative z-10">
+              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                  <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest">Patrimonio al {historicWealth.dateLabel}</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Conti Attivi + Inv. Personali</p>
+              </div>
+          </div>
+          
+          <div className="text-center md:text-right relative z-10">
+              <span className="text-3xl md:text-4xl font-black tracking-tight text-white block">
+                  {historicWealth.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-lg text-slate-500 font-bold">CHF</span>
+              </span>
+          </div>
       </div>
 
       {/* KPI Cards */}
@@ -438,6 +556,10 @@ export const Analysis: React.FC = () => {
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
                     <p className="text-sm text-slate-600">Le spese sono convertite in CHF alla data del movimento.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Il <strong>Patrimonio Storico</strong> mostra il saldo totale di tutti i conti (attivi e non) più il valore degli <strong>investimenti personali</strong> (esclusi fondi pensione) alla data indicata, usando il tasso di cambio di quel periodo.</p>
                  </li>
               </ul>
            </div>
