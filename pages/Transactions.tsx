@@ -173,7 +173,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conto</label>
-                <CustomSelect value={formData.account_id} onChange={(val) => setFormData(f => ({ ...f, account_id: val }))} options={accountOptions} placeholder="Seleziona..." />
+                <CustomSelect value={formData.account_id} onChange={(val) => setFormData(f => ({ ...f, account_id: val }))} options={accountOptions} placeholder="Seleziona..." searchable />
             </div>
             <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo ({currencyLabel})</label>
@@ -191,7 +191,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           
           {!isTransfer && (
             <div className="grid grid-cols-2 gap-6">
-               <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
+               <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} searchable /></div>
                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
             </div>
           )}
@@ -444,6 +444,36 @@ export const Transactions: React.FC = () => {
     return <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${styles[kind] || "bg-slate-50 text-slate-500 border-slate-200"}`}>{kind}</span>;
   };
 
+  // Helper per generare il contenuto del messaggio di eliminazione
+  const renderDeleteMessage = (tx?: Transaction) => {
+      if (!tx) return null;
+      const acc = getAccountInfoFromMap(tx.account_id);
+      return (
+          <div className="text-left mt-2 bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Data</span>
+                  <span className="text-sm font-bold text-slate-800">{new Date(tx.occurred_on).toLocaleDateString('it-IT')}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Importo</span>
+                  <span className={`text-sm font-black ${(tx.amount_original || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} {acc.currency}
+                  </span>
+              </div>
+              <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Conto</span>
+                  <span className="text-sm font-bold text-slate-800">{acc.name}</span>
+              </div>
+              {tx.description && (
+                  <div className="pt-2 mt-2 border-t border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Descrizione</span>
+                      <p className="text-sm text-slate-600 italic">"{tx.description}"</p>
+                  </div>
+              )}
+          </div>
+      );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
@@ -500,10 +530,10 @@ export const Transactions: React.FC = () => {
                 <div className="space-y-3 relative z-50">
                     <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
                     <div className="grid grid-cols-2 gap-2">
-                        <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} />
+                        <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} searchable />
                         <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
                     </div>
-                    <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} />
+                    <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} searchable />
                 </div>
                 
                 {/* Compact Types */}
@@ -675,7 +705,20 @@ export const Transactions: React.FC = () => {
 
       <TransactionModal isOpen={modalState.open} onClose={() => setModalState({ open: false })} onSave={async (t) => { if(t.id) await updateTransaction(t.id, t); else await addTransaction(t); }} initialData={modalState.initialData} accounts={accounts} categories={categories} />
       
-      <ConfirmModal isOpen={deleteDialog.open} onClose={() => setDeleteDialog({ open: false })} onConfirm={async () => { if(deleteDialog.tx) await deleteTransaction(deleteDialog.tx.id); setDeleteDialog({ open: false }); }} title="Elimina Movimento" message={`Confermi l'eliminazione di "${deleteDialog.tx?.description}"?`} confirmText="Elimina" isDangerous={true} />
+      <ConfirmModal 
+        isOpen={deleteDialog.open} 
+        onClose={() => setDeleteDialog({ open: false })} 
+        onConfirm={async () => { if(deleteDialog.tx) await deleteTransaction(deleteDialog.tx.id); setDeleteDialog({ open: false }); }} 
+        title="Elimina Movimento" 
+        message={
+            <div>
+                <p className="mb-4">Vuoi davvero eliminare questo movimento?</p>
+                {renderDeleteMessage(deleteDialog.tx)}
+            </div>
+        } 
+        confirmText="Elimina Definitivamente" 
+        isDangerous={true} 
+      />
       
       <FullScreenModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} title="Gestione Movimenti" subtitle="Help">
         <div className="space-y-6">

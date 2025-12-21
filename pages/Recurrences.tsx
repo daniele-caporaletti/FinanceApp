@@ -147,6 +147,91 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
   );
 };
 
+// --- MODAL STORICO MOVIMENTI ---
+interface RecurrenceHistoryModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    recurrence: EssentialTransaction | null;
+    transactions: Transaction[];
+    accounts: Account[];
+}
+
+const RecurrenceHistoryModal: React.FC<RecurrenceHistoryModalProps> = ({ isOpen, onClose, recurrence, transactions, accounts }) => {
+    if (!isOpen || !recurrence) return null;
+
+    // Filter transactions linked to this recurrence ID
+    const history = transactions
+        .filter(t => t.essential_transaction_id === recurrence.id)
+        .sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime());
+
+    const totalPaid = history.reduce((sum, t) => sum + (t.amount_original || 0), 0);
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]">
+                <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center flex-shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900">Storico Pagamenti</h2>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{recurrence.name}</p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 bg-slate-50 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50/50 sticky top-0 z-10">
+                            <tr>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Conto</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Note</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Importo</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {history.length > 0 ? history.map(tx => {
+                                const acc = accounts.find(a => a.id === tx.account_id);
+                                return (
+                                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-4 text-xs font-bold text-slate-600 whitespace-nowrap">
+                                            {new Date(tx.occurred_on).toLocaleDateString('it-IT')}
+                                        </td>
+                                        <td className="px-6 py-4 text-xs font-semibold text-slate-700">
+                                            {acc?.name || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 max-w-[200px] truncate">
+                                            {tx.description || '-'}
+                                        </td>
+                                        <td className={`px-6 py-4 text-right text-sm font-black whitespace-nowrap ${(tx.amount_original || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-[10px] text-slate-400 font-normal">{acc?.currency_code}</span>
+                                        </td>
+                                    </tr>
+                                );
+                            }) : (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 text-sm font-medium">
+                                        Nessun movimento registrato per questa voce.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {history.length > 0 && (
+                    <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center flex-shrink-0">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Totale Storico</span>
+                        <span className={`text-lg font-black ${totalPaid >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {totalPaid.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-xs text-slate-400 font-bold">CHF (Mix)</span>
+                        </span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- MODAL PAGAMENTO TRANSFER (DOPPIO MOVIMENTO) ---
 interface TransferPaymentModalProps {
     isOpen: boolean;
@@ -217,7 +302,7 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
                             In Uscita Da
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <CustomSelect value={fromAccount} onChange={setFromAccount} options={accountOptions} placeholder="Conto Partenza" />
+                            <CustomSelect value={fromAccount} onChange={setFromAccount} options={accountOptions} placeholder="Conto Partenza" searchable />
                             <div className="relative">
                                 <input type="number" step="0.01" required className="w-full px-4 py-3.5 bg-white border border-rose-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-rose-500" value={fromAmount} onChange={e => setFromAmount(parseFloat(e.target.value))} />
                                 <span className="absolute right-4 top-4 text-xs font-bold text-slate-400">{fromAccObj?.currency_code || '-'}</span>
@@ -231,7 +316,7 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
                             In Entrata Su
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <CustomSelect value={toAccount} onChange={setToAccount} options={accountOptions} placeholder="Conto Arrivo" />
+                            <CustomSelect value={toAccount} onChange={setToAccount} options={accountOptions} placeholder="Conto Arrivo" searchable />
                             <div className="relative">
                                 <input type="number" step="0.01" required className="w-full px-4 py-3.5 bg-white border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-emerald-500" value={toAmount} onChange={e => setToAmount(parseFloat(e.target.value))} />
                                 <span className="absolute right-4 top-4 text-xs font-bold text-slate-400">{toAccObj?.currency_code || '-'}</span>
@@ -255,15 +340,14 @@ export const Recurrences: React.FC = () => {
   const [modalState, setModalState] = useState<{ open: boolean; initialData?: Partial<EssentialTransaction> }>({ open: false });
   const [payModal, setPayModal] = useState<{ open: boolean; initialData?: Partial<Transaction>; isEdit?: boolean }>({ open: false });
   const [transferModal, setTransferModal] = useState<{ open: boolean; recurrence: EssentialTransaction | null; isPreparation?: boolean }>({ open: false, recurrence: null });
+  const [historyModal, setHistoryModal] = useState<{ open: boolean; recurrence: EssentialTransaction | null }>({ open: false, recurrence: null });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; rec?: EssentialTransaction }>({ open: false });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
   const shortMonthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 
-  // --- OPTIMIZATION START: PRE-CALCULATED LOOKUP MAPS ---
-  
-  // 1. Payment Map: O(1) lookup for transaction status
+  // ... (Optimization Maps logic remains the same)
   const paymentsMap = useMemo(() => {
       const map = new Map<string, Transaction>();
       transactions.forEach(t => {
@@ -275,8 +359,6 @@ export const Recurrences: React.FC = () => {
       return map;
   }, [transactions]);
 
-  // 2. Lookup Maps for Expenses and Transfers cells
-  // Key: `${name}-${monthIndex}`
   const createRecurrenceLookup = (list: EssentialTransaction[]) => {
       const map = new Map<string, EssentialTransaction>();
       list.forEach(t => {
@@ -294,7 +376,6 @@ export const Recurrences: React.FC = () => {
   const expensesLookup = useMemo(() => createRecurrenceLookup(essentialExpenses), [essentialExpenses, selectedYear]);
   const transfersLookup = useMemo(() => createRecurrenceLookup(essentialTransfers), [essentialTransfers, selectedYear]);
 
-  // Unique names lists
   const uniqueExpenseNames = useMemo(() => {
       const names = new Set<string>();
       essentialExpenses.forEach(t => {
@@ -313,7 +394,6 @@ export const Recurrences: React.FC = () => {
       return Array.from(names).sort((a, b) => a.localeCompare(b));
   }, [essentialTransfers, selectedYear]);
 
-  // Helper using Maps (O(1))
   const getEssentialFromMap = (map: Map<string, EssentialTransaction>, name: string, monthIdx: number) => {
       return map.get(`${name}-${monthIdx}`);
   };
@@ -322,7 +402,6 @@ export const Recurrences: React.FC = () => {
       const typeKey = kind === 'transfer' ? 'transfer' : 'expense';
       return paymentsMap.get(`${essentialId}-${typeKey}`);
   };
-  // --- OPTIMIZATION END ---
 
   const handlePreparation = (rec: EssentialTransaction) => {
       setTransferModal({ open: true, recurrence: rec, isPreparation: true });
@@ -332,17 +411,27 @@ export const Recurrences: React.FC = () => {
       if (rec.kind === 'transfer') {
           setTransferModal({ open: true, recurrence: rec, isPreparation: false });
       } else {
+          // AUTO-DETECT ACCOUNT FROM PREVIOUS PREPARATION (TRANSFER)
+          // Find if funds were set aside for this specific expense
+          const preparationTx = transactions
+            .filter(t => t.essential_transaction_id === rec.id && t.kind === 'transfer' && t.amount_original > 0)
+            .sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime())[0];
+
           const defaultAccount = accounts.find(a => a.status === 'active' && !a.exclude_from_overview) || accounts[0];
+          
+          // If we found a prep tx, use its account ID (destination of funds), otherwise use default
+          const prefilledAccountId = preparationTx ? preparationTx.account_id : (defaultAccount ? defaultAccount.id : '');
+
           setPayModal({
               open: true,
               isEdit: false,
               initialData: {
                   occurred_on: rec.occurred_on,
-                  amount_original: rec.amount_original, // Removed Math.abs so negative shows as negative
+                  amount_original: rec.amount_original, 
                   description: rec.description || '',
                   category_id: rec.category_id,
                   kind: rec.kind,
-                  account_id: defaultAccount ? defaultAccount.id : '',
+                  account_id: prefilledAccountId,
                   essential_transaction_id: rec.id,
                   tag: ''
               }
@@ -361,20 +450,14 @@ export const Recurrences: React.FC = () => {
   const handleSaveTransaction = async (tx: Partial<Transaction>) => {
       let finalAmount = tx.amount_original || 0;
       const expenseKinds = ['essential', 'personal', 'expense'];
-      
-      // Flip sign for amounts if it's an expense
       if (expenseKinds.includes(tx.kind || '') && finalAmount > 0) finalAmount = -finalAmount;
-      
       let finalBase = 0;
-
-      // MODIFICATO: Se è transfer, amount_base è sempre 0.
       if (tx.kind === 'transfer') {
           finalBase = 0;
       } else {
           finalBase = tx.amount_base || 0;
           if (expenseKinds.includes(tx.kind || '') && finalBase > 0) finalBase = -finalBase;
       }
-
       const payload = { ...tx, amount_original: finalAmount, amount_base: finalBase };
       if (tx.id) await updateTransaction(tx.id, payload);
       else await addTransaction(payload);
@@ -391,7 +474,7 @@ export const Recurrences: React.FC = () => {
       await addTransaction({
           account_id: fromAccount,
           amount_original: -Math.abs(fromAmount),
-          amount_base: 0, // Ensure no conversion
+          amount_base: 0,
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
@@ -400,7 +483,7 @@ export const Recurrences: React.FC = () => {
       await addTransaction({
           account_id: toAccount,
           amount_original: Math.abs(toAmount),
-          amount_base: 0, // Ensure no conversion
+          amount_base: 0,
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
@@ -419,8 +502,6 @@ export const Recurrences: React.FC = () => {
   }, []);
 
   const renderUnifiedTable = () => {
-      
-      // Calcola i totali mensili sommando sia Spese che Giroconti
       const monthlyTotals = shortMonthNames.map((_, idx) => {
           const expenseSum = uniqueExpenseNames.reduce((sum, name) => {
               const cellRec = getEssentialFromMap(expensesLookup, name, idx);
@@ -465,7 +546,6 @@ export const Recurrences: React.FC = () => {
                     <div className="sticky left-0 z-10 w-[130px] md:w-[140px] p-3 pl-4 bg-rose-50/95 backdrop-blur-sm border-r border-rose-100 md:border-r-0 font-black text-[10px] text-rose-500 uppercase tracking-widest flex items-center">
                         Spese Essenziali
                     </div>
-                    {/* Filler cells for section header to maintain grid structure visually if needed, or just let it span */}
                     <div className="flex-1 md:col-span-12"></div>
                 </div>
 
@@ -579,15 +659,37 @@ export const Recurrences: React.FC = () => {
       return (
           <>
               {buttonContent}
-              {!transaction && (
-                  <div className="hidden group-hover/cell:flex absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-100 rounded-lg p-1 gap-1 z-50 animate-in zoom-in duration-200">
-                      <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                  </div>
-              )}
+              <div className="hidden group-hover/cell:flex absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-100 rounded-lg p-1 gap-1 z-50 animate-in zoom-in duration-200">
+                  <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); setHistoryModal({ open: true, recurrence: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-slate-500" title="Storico"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+              </div>
           </>
       );
   };
+
+  // Helper per messaggio eliminazione ricorrenza
+  const renderDeleteMessage = (rec?: EssentialTransaction) => {
+      if(!rec) return null;
+      return (
+          <div className="text-left mt-2 bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nome</span>
+                  <span className="text-sm font-bold text-slate-800">{rec.name}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Data Prevista</span>
+                  <span className="text-sm font-bold text-slate-800">{new Date(rec.occurred_on).toLocaleDateString('it-IT')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Importo</span>
+                  <span className="text-sm font-black text-slate-800">
+                      {Math.abs(rec.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} {rec.currency_original || 'CHF'}
+                  </span>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-28">
@@ -655,12 +757,25 @@ export const Recurrences: React.FC = () => {
         customTitle={transferModal.isPreparation ? "Accantona Fondi" : "Esegui Giroconto"}
       />
 
+      <RecurrenceHistoryModal
+        isOpen={historyModal.open}
+        onClose={() => setHistoryModal({ open: false, recurrence: null })}
+        recurrence={historyModal.recurrence}
+        transactions={transactions}
+        accounts={accounts}
+      />
+
       <ConfirmModal 
         isOpen={deleteDialog.open} 
         onClose={() => setDeleteDialog({ open: false })} 
         onConfirm={async () => { if(deleteDialog.rec) await deleteEssential(deleteDialog.rec.id); setDeleteDialog({ open: false }); }}
         title="Elimina Voce"
-        message={`Eliminare "${deleteDialog.rec?.name}" del ${deleteDialog.rec?.occurred_on}?`}
+        message={
+            <div>
+                <p className="mb-4">Vuoi davvero eliminare questa voce pianificata?</p>
+                {renderDeleteMessage(deleteDialog.rec)}
+            </div>
+        }
         confirmText="Elimina"
         isDangerous={true}
       />
@@ -687,7 +802,7 @@ export const Recurrences: React.FC = () => {
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Il mese corrente viene evidenziato in tabella per facilitare la lettura.</p>
+                    <p className="text-sm text-slate-600">Per vedere lo <strong>Storico Pagamenti</strong> di una voce, passa il mouse sopra il pallino (su PC) e clicca sull'icona dell'orologio.</p>
                  </li>
               </ul>
            </div>
