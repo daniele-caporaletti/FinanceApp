@@ -407,6 +407,24 @@ export const Recurrences: React.FC = () => {
       setTransferModal({ open: true, recurrence: rec, isPreparation: true });
   };
 
+  const handleDuplicate = (rec: EssentialTransaction) => {
+      // Clona la data e la sposta al mese successivo
+      const current = new Date(rec.occurred_on);
+      const nextMonth = new Date(current.getFullYear(), current.getMonth() + 1, current.getDate());
+      
+      const newDateStr = nextMonth.toISOString().split('T')[0];
+
+      setModalState({ 
+          open: true, 
+          initialData: { 
+              ...rec, 
+              id: undefined, // Importante: rimuove l'ID per creare una nuova voce
+              occurred_on: newDateStr,
+              is_ready: false // Resetta lo stato
+          } 
+      });
+  };
+
   const handleNewPayment = (rec: EssentialTransaction) => {
       if (rec.kind === 'transfer') {
           setTransferModal({ open: true, recurrence: rec, isPreparation: false });
@@ -660,9 +678,10 @@ export const Recurrences: React.FC = () => {
           <>
               {buttonContent}
               <div className="hidden group-hover/cell:flex absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-100 rounded-lg p-1 gap-1 z-50 animate-in zoom-in duration-200">
-                  <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); setModalState({ open: true, initialData: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-blue-600" title="Modifica"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDuplicate(cellRec); }} className="p-1 hover:bg-slate-100 rounded text-indigo-500" title="Duplica"><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg></button>
                   <button onClick={(e) => { e.stopPropagation(); setHistoryModal({ open: true, recurrence: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-slate-500" title="Storico"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, rec: cellRec }); }} className="p-1 hover:bg-slate-100 rounded text-rose-600" title="Elimina"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
               </div>
           </>
       );
@@ -802,7 +821,7 @@ export const Recurrences: React.FC = () => {
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Per vedere lo <strong>Storico Pagamenti</strong> di una voce, passa il mouse sopra il pallino (su PC) e clicca sull'icona dell'orologio.</p>
+                    <p className="text-sm text-slate-600">Per duplicare una spesa in un altro mese, usa il tasto <strong>Duplica</strong> (icona fogli sovrapposti) nel menu a comparsa.</p>
                  </li>
               </ul>
            </div>
