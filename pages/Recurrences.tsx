@@ -65,8 +65,8 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
 
   // Opzioni filtrate come richiesto
   const typeOptions = [
-    { value: 'essential', label: 'Essential' },
-    { value: 'transfer', label: 'Giroconto' }
+    { value: 'essential', label: 'Spesa Essenziale' },
+    { value: 'transfer', label: 'Accantonamento (Pocket)' }
   ];
 
   const currencyOptions = [
@@ -75,12 +75,14 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
       { value: 'USD', label: 'USD' }
   ];
 
+  const isPocket = formData.kind === 'transfer';
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-visible animate-in zoom-in-95 duration-300">
         <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center rounded-t-[2.5rem]">
           <div>
-            <h2 className="text-xl font-black text-slate-900">{initialData?.id ? 'Modifica Regola' : 'Nuova Voce'}</h2>
+            <h2 className="text-xl font-black text-slate-900">{initialData?.id ? 'Modifica Voce' : 'Nuova Voce'}</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Pianificazione</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 bg-slate-50 rounded-full">
@@ -88,16 +90,21 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-10 space-y-6 bg-white rounded-b-[2.5rem]">
-          <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nome Spesa / Giroconto</label><input required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. Affitto, Risparmio..." value={formData.name || ''} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} /></div>
+          <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                  {isPocket ? 'Nome Pocket / Obiettivo' : 'Nome Spesa'}
+              </label>
+              <input required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder={isPocket ? "es. Risparmio Vacanze..." : "es. Affitto..."} value={formData.name || ''} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} />
+          </div>
           
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Giorno Previsto</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /><p className="text-[9px] text-slate-400 px-1">La data determina in quale mese/anno apparirà il pallino.</p></div>
+            <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Giorno Previsto</label><input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={formData.occurred_on?.split('T')[0] || ''} onChange={e => setFormData(f => ({ ...f, occurred_on: e.target.value }))} /><p className="text-[9px] text-slate-400 px-1">La data determina il mese.</p></div>
             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipo</label><CustomSelect value={formData.kind} onChange={(val) => setFormData(f => ({ ...f, kind: val }))} options={typeOptions} /></div>
           </div>
           
           <div className="grid grid-cols-3 gap-6">
              <div className="col-span-2 space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo Previsto</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Importo</label>
                 <input 
                     type="number" 
                     step="0.01" 
@@ -114,8 +121,8 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
              </div>
           </div>
 
-          {/* Categorie nascoste per transfer */}
-          {formData.kind !== 'transfer' && (
+          {/* Categorie nascoste per transfer/pocket */}
+          {!isPocket && (
             <div className="grid grid-cols-2 gap-6">
                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} /></div>
                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
@@ -123,7 +130,7 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Note (Descrizione Movimento)</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Note</label>
             <textarea 
                 rows={2} 
                 className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 resize-none" 
@@ -137,10 +144,10 @@ const EssentialExpenseModal: React.FC<EssentialExpenseModalProps> = ({ isOpen, o
              <div className={`w-10 h-5 rounded-full relative transition-all ${formData.is_ready ? 'bg-emerald-500' : 'bg-slate-300'}`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${formData.is_ready ? 'left-6' : 'left-1'}`}></div>
              </div>
-             <span className="text-xs font-bold text-slate-700">Fondi Già Accantonati (Pronta)</span>
+             <span className="text-xs font-bold text-slate-700">Fondi Già Disponibili (Pronta)</span>
           </div>
 
-          <button type="submit" disabled={loading} className={`w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Salva Voce'}</button>
+          <button type="submit" disabled={loading} className={`w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Salva'}</button>
         </form>
       </div>
     </div>
@@ -171,7 +178,7 @@ const RecurrenceHistoryModal: React.FC<RecurrenceHistoryModalProps> = ({ isOpen,
             <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]">
                 <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center flex-shrink-0">
                     <div>
-                        <h2 className="text-xl font-black text-slate-900">Storico Pagamenti</h2>
+                        <h2 className="text-xl font-black text-slate-900">Storico</h2>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{recurrence.name}</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 bg-slate-50 rounded-full">
@@ -211,7 +218,7 @@ const RecurrenceHistoryModal: React.FC<RecurrenceHistoryModalProps> = ({ isOpen,
                             }) : (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-12 text-center text-slate-400 text-sm font-medium">
-                                        Nessun movimento registrato per questa voce.
+                                        Nessun movimento registrato.
                                     </td>
                                 </tr>
                             )}
@@ -232,7 +239,7 @@ const RecurrenceHistoryModal: React.FC<RecurrenceHistoryModalProps> = ({ isOpen,
     );
 };
 
-// --- MODAL PAGAMENTO TRANSFER (DOPPIO MOVIMENTO) ---
+// --- MODAL PAGAMENTO TRANSFER (DOPPIO MOVIMENTO) -> ORA "ALIMENTA POCKET" ---
 interface TransferPaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -283,7 +290,7 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-visible animate-in zoom-in-95 duration-300">
                 <div className="px-10 py-7 bg-[#fcfdfe] border-b border-slate-100 flex justify-between items-center rounded-t-[2.5rem]">
                     <div>
-                        <h2 className="text-xl font-black text-slate-900">{customTitle || "Esegui Giroconto"}</h2>
+                        <h2 className="text-xl font-black text-slate-900">{customTitle || "Alimenta Pocket"}</h2>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{recurrence.name}</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 bg-slate-50 rounded-full">
@@ -292,17 +299,17 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
                 </div>
                 <form onSubmit={handleSubmit} className="p-10 space-y-6 bg-white rounded-b-[2.5rem]">
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data Movimento</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Data</label>
                         <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" value={date.split('T')[0]} onChange={e => setDate(e.target.value)} />
                     </div>
 
                     <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 space-y-3">
                         <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                            In Uscita Da
+                            Preleva da (Sorgente)
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <CustomSelect value={fromAccount} onChange={setFromAccount} options={accountOptions} placeholder="Conto Partenza" searchable />
+                            <CustomSelect value={fromAccount} onChange={setFromAccount} options={accountOptions} placeholder="Conto..." searchable />
                             <div className="relative">
                                 <input type="number" step="0.01" required className="w-full px-4 py-3.5 bg-white border border-rose-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-rose-500" value={fromAmount} onChange={e => setFromAmount(parseFloat(e.target.value))} />
                                 <span className="absolute right-4 top-4 text-xs font-bold text-slate-400">{fromAccObj?.currency_code || '-'}</span>
@@ -310,21 +317,21 @@ const TransferPaymentModal: React.FC<TransferPaymentModalProps> = ({ isOpen, onC
                         </div>
                     </div>
 
-                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-3">
-                        <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                    <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-3">
+                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
-                            In Entrata Su
+                            Versa su (Destinazione)
                         </h4>
                         <div className="grid grid-cols-2 gap-4">
-                            <CustomSelect value={toAccount} onChange={setToAccount} options={accountOptions} placeholder="Conto Arrivo" searchable />
+                            <CustomSelect value={toAccount} onChange={setToAccount} options={accountOptions} placeholder="Pocket..." searchable />
                             <div className="relative">
-                                <input type="number" step="0.01" required className="w-full px-4 py-3.5 bg-white border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-emerald-500" value={toAmount} onChange={e => setToAmount(parseFloat(e.target.value))} />
+                                <input type="number" step="0.01" required className="w-full px-4 py-3.5 bg-white border border-indigo-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-indigo-500" value={toAmount} onChange={e => setToAmount(parseFloat(e.target.value))} />
                                 <span className="absolute right-4 top-4 text-xs font-bold text-slate-400">{toAccObj?.currency_code || '-'}</span>
                             </div>
                         </div>
                     </div>
 
-                    <button type="submit" disabled={loading} className={`w-full py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-slate-800 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Registra Giroconto'}</button>
+                    <button type="submit" disabled={loading} className={`w-full py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-slate-800 transition-all uppercase tracking-widest text-sm ${loading ? 'opacity-50' : ''}`}>{loading ? '...' : 'Conferma Accantonamento'}</button>
                 </form>
             </div>
         </div>
@@ -408,36 +415,70 @@ export const Recurrences: React.FC = () => {
   };
 
   const handleDuplicate = (rec: EssentialTransaction) => {
-      // Clona la data e la sposta al mese successivo
       const current = new Date(rec.occurred_on);
       const nextMonth = new Date(current.getFullYear(), current.getMonth() + 1, current.getDate());
-      
       const newDateStr = nextMonth.toISOString().split('T')[0];
 
       setModalState({ 
           open: true, 
           initialData: { 
               ...rec, 
-              id: undefined, // Importante: rimuove l'ID per creare una nuova voce
+              id: undefined, 
               occurred_on: newDateStr,
-              is_ready: false // Resetta lo stato
+              is_ready: false
           } 
       });
+  };
+
+  // Funzione per gestire l'inizio del trascinamento
+  const handleDragStart = (e: React.DragEvent, rec: EssentialTransaction) => {
+      e.dataTransfer.setData("application/json", JSON.stringify(rec));
+      e.dataTransfer.effectAllowed = "copy";
+  };
+
+  // Funzione per gestire il rilascio (Drop) e duplicare
+  const handleCellDrop = (e: React.DragEvent, monthIdx: number) => {
+      e.preventDefault();
+      const data = e.dataTransfer.getData("application/json");
+      if (!data) return;
+
+      try {
+          const sourceRec = JSON.parse(data) as EssentialTransaction;
+          
+          const originalDate = new Date(sourceRec.occurred_on);
+          const targetDate = new Date(selectedYear, monthIdx, originalDate.getDate());
+          
+          if (targetDate.getMonth() !== monthIdx) {
+             targetDate.setDate(0); 
+          }
+          
+          const newDateStr = new Date(targetDate.getTime() - (targetDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+          setModalState({ 
+              open: true, 
+              initialData: { 
+                  ...sourceRec, 
+                  id: undefined,
+                  occurred_on: newDateStr,
+                  is_ready: false
+              } 
+          });
+
+      } catch (err) {
+          console.error("Errore nel parsing del drag data", err);
+      }
   };
 
   const handleNewPayment = (rec: EssentialTransaction) => {
       if (rec.kind === 'transfer') {
           setTransferModal({ open: true, recurrence: rec, isPreparation: false });
       } else {
-          // AUTO-DETECT ACCOUNT FROM PREVIOUS PREPARATION (TRANSFER)
-          // Find if funds were set aside for this specific expense
+          // Logic for normal expense
           const preparationTx = transactions
             .filter(t => t.essential_transaction_id === rec.id && t.kind === 'transfer' && t.amount_original > 0)
             .sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime())[0];
 
           const defaultAccount = accounts.find(a => a.status === 'active' && !a.exclude_from_overview) || accounts[0];
-          
-          // If we found a prep tx, use its account ID (destination of funds), otherwise use default
           const prefilledAccountId = preparationTx ? preparationTx.account_id : (defaultAccount ? defaultAccount.id : '');
 
           setPayModal({
@@ -487,7 +528,7 @@ export const Recurrences: React.FC = () => {
       
       const description = transferModal.isPreparation 
         ? `Accantonamento: ${transferModal.recurrence.name}`
-        : `Giroconto: ${transferModal.recurrence.name}`;
+        : `Accantonamento: ${transferModal.recurrence.name}`; // Unified text
 
       await addTransaction({
           account_id: fromAccount,
@@ -496,7 +537,7 @@ export const Recurrences: React.FC = () => {
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
-          description: description + " (Out)"
+          description: description + " (Prelievo)"
       });
       await addTransaction({
           account_id: toAccount,
@@ -505,7 +546,7 @@ export const Recurrences: React.FC = () => {
           kind: 'transfer',
           occurred_on: date,
           essential_transaction_id: transferModal.recurrence.id,
-          description: description + " (In)"
+          description: description + " (Versamento Pocket)"
       });
 
       if (transferModal.isPreparation) {
@@ -541,11 +582,12 @@ export const Recurrences: React.FC = () => {
             <h3 className="text-lg font-black text-slate-900 tracking-tight">Pianificazione Annuale</h3>
         </div>
         
-        <div className="flex-1 overflow-x-auto md:overflow-x-visible custom-scrollbar relative bg-white w-full">
-            <div className="min-w-max md:min-w-full md:w-full">
+        <div className="flex-1 overflow-x-auto md:overflow-visible custom-scrollbar relative bg-white w-full">
+            <div className="min-w-max md:min-w-0 md:w-full">
                 
                 {/* Header Grid: Months */}
-                <div className="sticky top-0 z-20 flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 shadow-sm w-full">
+                {/* Fixed column 160px for label to have more space */}
+                <div className="sticky top-0 z-20 flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100 shadow-sm w-full">
                     <div className="sticky left-0 z-30 w-[130px] md:w-auto p-4 font-black text-[10px] text-slate-400 uppercase tracking-widest bg-slate-50/95 backdrop-blur-sm border-r border-slate-200 md:border-r-0 flex items-center">
                         Periodo
                     </div>
@@ -560,8 +602,8 @@ export const Recurrences: React.FC = () => {
                 </div>
 
                 {/* --- SEZIONE SPESE ESSENZIALI --- */}
-                <div className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-rose-50/30 border-b border-rose-100 w-full sticky left-0 z-10">
-                    <div className="sticky left-0 z-10 w-[130px] md:w-[140px] p-3 pl-4 bg-rose-50/95 backdrop-blur-sm border-r border-rose-100 md:border-r-0 font-black text-[10px] text-rose-500 uppercase tracking-widest flex items-center">
+                <div className="flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] bg-rose-50/30 border-b border-rose-100 w-full sticky left-0 z-10">
+                    <div className="sticky left-0 z-10 w-[130px] md:w-auto p-3 pl-4 bg-rose-50/95 backdrop-blur-sm border-r border-rose-100 md:border-r-0 font-black text-[10px] text-rose-500 uppercase tracking-widest flex items-center">
                         Spese Essenziali
                     </div>
                     <div className="flex-1 md:col-span-12"></div>
@@ -569,7 +611,7 @@ export const Recurrences: React.FC = () => {
 
                 <div className="divide-y divide-slate-50">
                     {uniqueExpenseNames.map((recName) => (
-                        <div key={recName} className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
+                        <div key={recName} className="flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
                             <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center border-l-4 border-l-transparent group-hover:border-l-rose-400">
                                 <span className="font-bold text-xs text-slate-800 truncate" title={recName}>{recName}</span>
                             </div>
@@ -578,8 +620,17 @@ export const Recurrences: React.FC = () => {
                                 const cellRec = getEssentialFromMap(expensesLookup, recName, idx);
                                 const isCurrentMonth = idx === currentRealDate.getMonth() && selectedYear === currentRealDate.getFullYear();
                                 return (
-                                    <div key={idx} className={`w-[80px] md:w-auto flex-shrink-0 h-[44px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}>
-                                        {cellRec ? renderCellContent(cellRec) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
+                                    <div 
+                                        key={idx} 
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => handleCellDrop(e, idx)}
+                                        className={`w-[80px] md:w-auto flex-shrink-0 h-[48px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}
+                                    >
+                                        {cellRec ? (
+                                            <div draggable onDragStart={(e) => handleDragStart(e, cellRec)} className="cursor-grab active:cursor-grabbing w-full px-1">
+                                                {renderCellContent(cellRec)}
+                                            </div>
+                                        ) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
                                     </div>
                                 );
                             })}
@@ -587,18 +638,19 @@ export const Recurrences: React.FC = () => {
                     ))}
                 </div>
 
-                {/* --- SEZIONE GIROCONTI --- */}
-                <div className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-blue-50/30 border-y border-blue-100 w-full sticky left-0 z-10 mt-1">
-                    <div className="sticky left-0 z-10 w-[130px] md:w-[140px] p-3 pl-4 bg-blue-50/95 backdrop-blur-sm border-r border-blue-100 md:border-r-0 font-black text-[10px] text-blue-500 uppercase tracking-widest flex items-center">
-                        Giroconti
+                {/* --- SEZIONE POCKETS / ACCANTONAMENTI --- */}
+                <div className="flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] bg-indigo-50/30 border-y border-indigo-100 w-full sticky left-0 z-10 mt-1">
+                    <div className="sticky left-0 z-10 w-[130px] md:w-auto p-3 pl-4 bg-indigo-50/95 backdrop-blur-sm border-r border-indigo-100 md:border-r-0 font-black text-[10px] text-indigo-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        Accantonamenti
                     </div>
                     <div className="flex-1 md:col-span-12"></div>
                 </div>
 
                 <div className="divide-y divide-slate-50">
                     {uniqueTransferNames.map((recName) => (
-                        <div key={recName} className="flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
-                            <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center border-l-4 border-l-transparent group-hover:border-l-blue-400">
+                        <div key={recName} className="flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] group hover:bg-slate-50 transition-colors w-full">
+                            <div className="sticky left-0 z-10 w-[130px] md:w-auto p-4 bg-white border-r border-slate-100 md:border-r-0 group-hover:bg-slate-50 transition-colors flex items-center border-l-4 border-l-transparent group-hover:border-l-indigo-400">
                                 <span className="font-bold text-xs text-slate-800 truncate" title={recName}>{recName}</span>
                             </div>
                             
@@ -606,8 +658,17 @@ export const Recurrences: React.FC = () => {
                                 const cellRec = getEssentialFromMap(transfersLookup, recName, idx);
                                 const isCurrentMonth = idx === currentRealDate.getMonth() && selectedYear === currentRealDate.getFullYear();
                                 return (
-                                    <div key={idx} className={`w-[80px] md:w-auto flex-shrink-0 h-[44px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}>
-                                        {cellRec ? renderCellContent(cellRec) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
+                                    <div 
+                                        key={idx} 
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => handleCellDrop(e, idx)}
+                                        className={`w-[80px] md:w-auto flex-shrink-0 h-[48px] flex items-center justify-center relative group/cell border-r border-slate-50/50 md:border-r-0 last:border-r-0 ${isCurrentMonth ? 'bg-blue-50/10' : ''}`}
+                                    >
+                                        {cellRec ? (
+                                            <div draggable onDragStart={(e) => handleDragStart(e, cellRec)} className="cursor-grab active:cursor-grabbing w-full px-1">
+                                                {renderCellContent(cellRec)}
+                                            </div>
+                                        ) : <div className="w-1 h-1 rounded-full bg-slate-100"></div>}
                                     </div>
                                 );
                             })}
@@ -616,7 +677,7 @@ export const Recurrences: React.FC = () => {
                 </div>
 
                 {/* Footer Totals */}
-                <div className="sticky bottom-0 z-20 flex md:grid md:grid-cols-[140px_repeat(12,minmax(0,1fr))] bg-slate-50 border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full">
+                <div className="sticky bottom-0 z-20 flex md:grid md:grid-cols-[160px_repeat(12,minmax(0,1fr))] bg-slate-50 border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full">
                     <div className="sticky left-0 z-30 w-[130px] md:w-auto p-4 font-black text-[10px] text-slate-500 uppercase tracking-widest bg-slate-50 border-r border-slate-200 md:border-r-0 flex items-center">
                         Totale
                     </div>
@@ -641,9 +702,12 @@ export const Recurrences: React.FC = () => {
       const isReady = cellRec.is_ready;
 
       let buttonContent;
+      // Use w-full to fill the grid cell on desktop, allowing equal distribution
+      const buttonBaseClass = "w-[70px] md:w-full h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative";
+
       if (transaction) {
           buttonContent = (
-              <button onClick={() => handleEditPayment(transaction)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 flex flex-col items-center justify-center shadow-sm active:scale-95 transition-transform">
+              <button onClick={() => handleEditPayment(transaction)} className={`w-[70px] md:w-full h-8 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 flex flex-col items-center justify-center shadow-sm active:scale-95 transition-transform`}>
                   <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
                   <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
               </button>
@@ -652,7 +716,7 @@ export const Recurrences: React.FC = () => {
           buttonContent = (
               <button 
                   onClick={() => handleNewPayment(cellRec)}
-                  className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-amber-200 text-amber-600 bg-amber-50/30'}`}
+                  className={`${buttonBaseClass} ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-indigo-200 text-indigo-600 bg-indigo-50/30'}`}
               >
                   <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
                   <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
@@ -660,14 +724,14 @@ export const Recurrences: React.FC = () => {
           );
       } else if (cellRec.kind === 'essential' && !isReady) {
           buttonContent = (
-              <button onClick={() => handlePreparation(cellRec)} className="w-[70px] md:w-full md:mx-1 h-8 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 flex flex-col items-center justify-center active:scale-95 transition-transform relative">
+              <button onClick={() => handlePreparation(cellRec)} className="w-[70px] md:w-full h-8 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 flex flex-col items-center justify-center active:scale-95 transition-transform relative">
                   <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
                   <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
               </button>
           );
       } else {
           buttonContent = (
-              <button onClick={() => handleNewPayment(cellRec)} className={`w-[70px] md:w-full md:mx-1 h-8 rounded-lg border-2 flex flex-col items-center justify-center active:scale-95 transition-transform relative ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-blue-200 text-blue-500 bg-blue-50/30'}`}>
+              <button onClick={() => handleNewPayment(cellRec)} className={`${buttonBaseClass} ${isOverdue ? 'border-rose-200 text-rose-500 bg-white' : 'border-blue-200 text-blue-500 bg-blue-50/30'}`}>
                   <span className="text-[9px] font-bold leading-none tracking-tighter">{formattedAmount}</span>
                   <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{currency}</span>
               </button>
@@ -773,7 +837,7 @@ export const Recurrences: React.FC = () => {
         onSave={handleSaveTransfer}
         recurrence={transferModal.recurrence}
         accounts={accounts}
-        customTitle={transferModal.isPreparation ? "Accantona Fondi" : "Esegui Giroconto"}
+        customTitle={transferModal.isPreparation ? "Accantona Fondi" : "Alimenta Pocket"}
       />
 
       <RecurrenceHistoryModal
@@ -808,7 +872,7 @@ export const Recurrences: React.FC = () => {
         <div className="space-y-6">
            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                  Questa vista ti permette di vedere a colpo d'occhio lo stato dei pagamenti ricorrenti.
+                  Questa vista ti permette di vedere a colpo d'occhio lo stato dei pagamenti ricorrenti e dei risparmi mensili.
                </p>
            </div>
            
@@ -821,7 +885,11 @@ export const Recurrences: React.FC = () => {
                  </li>
                  <li className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Per duplicare una spesa in un altro mese, usa il tasto <strong>Duplica</strong> (icona fogli sovrapposti) nel menu a comparsa.</p>
+                    <p className="text-sm text-slate-600">Gli <strong>Accantonamenti (Pocket)</strong> servono per tracciare i risparmi ricorrenti (es. Vacanze, Tasse). Quando clicchi sul pallino, ti verrà chiesto da quale conto prelevare e su quale Pocket versare.</p>
+                 </li>
+                 <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
+                    <p className="text-sm text-slate-600">Per duplicare una voce in un altro mese, <strong>trascina il quadratino</strong> sulla casella vuota del mese desiderato.</p>
                  </li>
               </ul>
            </div>
