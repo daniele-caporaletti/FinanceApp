@@ -161,8 +161,8 @@ export const Analysis: React.FC = () => {
       const liquidityAccounts = accounts.filter(a => (a.kind === 'cash' || a.kind === 'pocket') && a.status === 'active');
       const wealthAccounts = accounts.filter(a => (a.kind === 'invest' || a.kind === 'pension') && a.status === 'active');
 
-      const liquidityList = liquidityAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a,b) => b.balance - a.balance);
-      const wealthList = wealthAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a,b) => b.balance - a.balance);
+      const liquidityList = liquidityAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a: any, b: any) => b.balance - a.balance);
+      const wealthList = wealthAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a: any, b: any) => b.balance - a.balance);
 
       const totalLiquidity = liquidityList.reduce((acc, curr) => acc + curr.balance, 0);
       const totalWealth = wealthList.reduce((acc, curr) => acc + curr.balance, 0);
@@ -722,7 +722,7 @@ export const Analysis: React.FC = () => {
                        <code className="text-xs bg-white p-1 rounded border border-slate-200 block text-slate-500 font-mono">
                            (Entrate - Uscite) / Entrate * 100
                        </code>
-                       <p className="text-[10px] text-slate-400 mt-2 italic">Es. Entri 5.000, Spendi 3.000 -> SR 40%</p>
+                       <p className="text-[10px] text-slate-400 mt-2 italic">Es. Entri 5.000, Spendi 3.000 &rarr; SR 40%</p>
                    </div>
                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Media Spese (Burn Rate)</span>

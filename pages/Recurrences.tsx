@@ -471,7 +471,7 @@ export const Recurrences: React.FC = () => {
     const unique = Array.from(new Set(years));
     const currentY = new Date().getFullYear();
     if (!unique.includes(currentY)) unique.push(currentY);
-    return unique.sort((a, b) => b - a);
+    return unique.sort((a: number, b: number) => b - a);
   }, [essentialTransactions]);
 
   const yearOptions = useMemo(() => availableYears.map(y => ({ value: y, label: y.toString() })), [availableYears]);
