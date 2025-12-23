@@ -10,21 +10,26 @@ export const fetchExchangeRate = async (date: string, from: string, to: string):
   // Se la data è futura, usa 'latest'
   const queryDate = date > today ? 'latest' : date;
   
+  const performFetch = async (dateParam: string) => {
+      const response = await fetch(`https://api.frankfurter.dev/v1/${dateParam}?base=${from}&symbols=${to}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (!data || !data.rates || typeof data.rates[to] === 'undefined') {
+          throw new Error('Invalid API response structure: missing rates');
+      }
+      return data.rates[to];
+  };
+
   try {
-    // Utilizza endpoint v1 come richiesto: https://api.frankfurter.dev/v1/{date}?base={from}&symbols={to}
-    const response = await fetch(`https://api.frankfurter.dev/v1/${queryDate}?base=${from}&symbols=${to}`);
-    
-    if (!response.ok) throw new Error('Rate fetch failed');
-    
-    const data = await response.json();
-    return data.rates[to];
+    return await performFetch(queryDate);
   } catch (e) {
     try {
-        // Fallback su latest se la chiamata con data specifica fallisce
-        console.warn(`Rate fetch failed for date ${date}, trying latest.`);
-        const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`);
-        const data = await response.json();
-        return data.rates[to];
+        // Fallback su latest se la chiamata con data specifica fallisce e non stavamo già provando latest
+        if (queryDate !== 'latest') {
+            console.warn(`Rate fetch failed for date ${date}, trying latest.`);
+            return await performFetch('latest');
+        }
+        throw e;
     } catch (e2) {
         console.error("Impossibile recuperare tasso di cambio.", e2);
         return 1; // Fallback estremo 1:1

@@ -7,10 +7,25 @@ import { FullScreenModal } from '../components/FullScreenModal';
 import { CustomSelect } from '../components/CustomSelect';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell 
+  PieChart, Pie, Cell, ReferenceLine
 } from 'recharts';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+
+// Tooltip per il BarChart del Cashflow
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border border-slate-100 shadow-xl rounded-xl z-50">
+          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</p>
+          <div className="text-xs font-black text-slate-900">
+              Netto: {payload[0].value > 0 ? '+' : ''}{payload[0].value.toLocaleString('it-IT')}
+          </div>
+        </div>
+      );
+    }
+    return null;
+};
 
 export const Dashboard: React.FC = () => {
   const { transactions, accounts, essentialTransactions, categories } = useFinance();
@@ -39,10 +54,19 @@ export const Dashboard: React.FC = () => {
           fetch('https://api.frankfurter.dev/v1/latest?base=EUR&symbols=CHF'),
           fetch('https://api.frankfurter.dev/v1/latest?base=USD&symbols=CHF')
         ]);
-        const dataEur = await resEur.json();
-        const dataUsd = await resUsd.json();
-        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
-      } catch (error) { console.error(error); }
+        
+        const dataEur = resEur.ok ? await resEur.json() : null;
+        const dataUsd = resUsd.ok ? await resUsd.json() : null;
+        
+        setRates({ 
+            CHF: 1, 
+            EUR: dataEur?.rates?.CHF ?? 1, 
+            USD: dataUsd?.rates?.CHF ?? 1 
+        });
+      } catch (error) { 
+          console.error("Dashboard rate fetch error", error); 
+          // Default fallbacks are already set in initial state
+      }
     };
     fetchRates();
   }, []);
@@ -106,20 +130,43 @@ export const Dashboard: React.FC = () => {
     return { liquidity: liquidityCHF, investments: investmentsCHF };
   }, [accounts, transactions, rates]); 
 
-  // 2. Variabili Mese Corrente
-  const currentMonthRealVariables = useMemo(() => {
+  // 2. Variabili Mese Corrente vs Mese Precedente
+  const variableExpensesStats = useMemo(() => {
       const now = new Date();
       const currentY = now.getFullYear();
       const currentM = now.getMonth();
+      
+      // Calcolo Mese Precedente
+      const prevDate = new Date(currentY, currentM - 1, 1);
+      const prevY = prevDate.getFullYear();
+      const prevM = prevDate.getMonth();
 
-      let total = 0;
+      let currentTotal = 0;
+      let prevTotal = 0;
+
       transactions.forEach(t => {
           const [tY, tM] = t.occurred_on.split('-').map(Number);
-          if (tY === currentY && (tM - 1) === currentM && t.kind === 'expense_personal') {
-              total += Math.abs(t.amount_base || 0);
+          const tMonthIdx = tM - 1;
+          
+          if (t.kind === 'expense_personal') {
+              const amount = Math.abs(t.amount_base || 0);
+              
+              if (tY === currentY && tMonthIdx === currentM) {
+                  currentTotal += amount;
+              } else if (tY === prevY && tMonthIdx === prevM) {
+                  prevTotal += amount;
+              }
           }
       });
-      return total;
+
+      let diffPercent = 0;
+      if (prevTotal > 0) {
+          diffPercent = ((currentTotal - prevTotal) / prevTotal) * 100;
+      } else if (currentTotal > 0) {
+          diffPercent = 100;
+      }
+
+      return { currentTotal, prevTotal, diffPercent };
   }, [transactions]);
 
   // 3. Pulse
@@ -266,9 +313,17 @@ export const Dashboard: React.FC = () => {
       return { expenses, allocations };
   }, [essentialTransactions, transactions, selectedYear, selectedMonth, currentDayOfMonth, currentRealDate]);
 
-  // 7. Matrice Dati
+  // 7. Matrice Dati (Cashflow & Chart)
   const matrixData = useMemo(() => {
-    const data = Array.from({ length: 12 }, () => ({ income: 0, variable: 0, fixed: 0, workIncome: 0, workExpense: 0 }));
+    const data = Array.from({ length: 12 }, (_, i) => ({ 
+        month: shortMonthNames[i], 
+        income: 0, 
+        variable: 0, 
+        fixed: 0, 
+        workIncome: 0, 
+        workExpense: 0,
+        net: 0 
+    }));
     
     transactions.forEach(t => {
       const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
@@ -289,8 +344,24 @@ export const Dashboard: React.FC = () => {
               data[monthIdx].workExpense += amount; break;
       }
     });
+
+    // Calculate Net Savings for Chart
+    data.forEach(d => {
+        d.net = (d.income + d.workIncome) - (d.variable + d.fixed + d.workExpense);
+    });
+
     return data;
   }, [transactions, selectedYear]);
+
+  const matrixTotals = useMemo(() => matrixData.reduce((acc, curr) => ({
+      income: acc.income + curr.income,
+      variable: acc.variable + curr.variable,
+      fixed: acc.fixed + curr.fixed,
+      workIncome: acc.workIncome + curr.workIncome,
+      workExpense: acc.workExpense + curr.workExpense
+    }), { income: 0, variable: 0, fixed: 0, workIncome: 0, workExpense: 0 }), [matrixData]);
+
+  const grandTotalNet = (matrixTotals.income + matrixTotals.workIncome) - (matrixTotals.variable + matrixTotals.fixed + matrixTotals.workExpense);
 
   const goToTransactions = (monthIdx: number, type: 'income' | 'variable' | 'fixed' | 'work_income' | 'work_expense') => {
     const monthsFilter = monthIdx === -1 ? [] : [monthIdx + 1];
@@ -341,11 +412,19 @@ export const Dashboard: React.FC = () => {
 
           <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4 -mx-2 px-2 md:mx-0 md:px-0">
               {/* CARD 1: USCITE VARIABILI */}
-              <div onClick={handleVariableExpensesClick} className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-center h-auto min-h-[90px]">
-                 <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mb-1 truncate w-full">Uscite Variabili</span>
+              <div onClick={handleVariableExpensesClick} className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-center h-auto min-h-[90px] relative overflow-hidden group">
+                 <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left w-full">
+                    <div className="flex items-center gap-2 mb-1 w-full justify-center md:justify-start">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">Uscite Variabili</span>
+                        {/* Comparison Indicator */}
+                        {variableExpensesStats.diffPercent !== 0 && (
+                            <span className={`text-[9px] font-black px-1.5 rounded flex items-center ${variableExpensesStats.diffPercent > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                {variableExpensesStats.diffPercent > 0 ? '▲' : '▼'} {Math.abs(variableExpensesStats.diffPercent).toFixed(0)}%
+                            </span>
+                        )}
+                    </div>
                     <div className="text-sm md:text-2xl font-black text-indigo-600 md:text-slate-900 tracking-tight truncate w-full">
-                        {currentMonthRealVariables.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-[10px] md:text-base font-bold text-slate-400">CHF</span>
+                        {variableExpensesStats.currentTotal.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-[10px] md:text-base font-bold text-slate-400">CHF</span>
                     </div>
                  </div>
               </div>
@@ -603,6 +682,25 @@ export const Dashboard: React.FC = () => {
                 <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">CHF</span>
              </div>
              
+             {/* NET SAVINGS TREND CHART */}
+             <div className="h-[120px] w-full px-4 pt-4 border-b border-slate-50">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={matrixData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
+                        <ReferenceLine y={0} stroke="#e2e8f0" strokeDasharray="3 3" />
+                        <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f8fafc'}} />
+                        <Bar dataKey="net" radius={[2, 2, 0, 0]}>
+                            {matrixData.map((entry, index) => (
+                                <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={entry.net >= 0 ? '#10b981' : '#ef4444'} 
+                                    fillOpacity={selectedMonth === index ? 1 : 0.4}
+                                />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+             </div>
+
              <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full border-collapse min-w-[350px] table-fixed text-left">
                    <thead>

@@ -148,8 +148,6 @@ const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onSave, in
   );
 };
 
-// ... (SwipeableAccountItem and Accounts component remain visually same but with updated useEffect for API)
-
 // --- MOBILE SWIPEABLE ITEM FOR ACCOUNTS ---
 interface SwipeableAccountProps { 
   children: React.ReactNode; 
@@ -160,7 +158,6 @@ interface SwipeableAccountProps {
 }
 
 const SwipeableAccountItem: React.FC<SwipeableAccountProps> = ({ children, onEdit, onToggle, isHidden, colorClass }) => {
-  // ... (Keeping SwipeableAccountItem as is) ...
   const [offsetX, setOffsetX] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -269,15 +266,23 @@ export const Accounts: React.FC = () => {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        // Updated API endpoint
         const [resEur, resUsd] = await Promise.all([
           fetch('https://api.frankfurter.dev/v1/latest?base=EUR&symbols=CHF'),
           fetch('https://api.frankfurter.dev/v1/latest?base=USD&symbols=CHF')
         ]);
-        const dataEur = await resEur.json();
-        const dataUsd = await resUsd.json();
-        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
-      } catch (error) { console.error("Rate fetch error", error); }
+        
+        const dataEur = resEur.ok ? await resEur.json() : null;
+        const dataUsd = resUsd.ok ? await resUsd.json() : null;
+        
+        setRates({ 
+            CHF: 1, 
+            EUR: dataEur?.rates?.CHF ?? 1, 
+            USD: dataUsd?.rates?.CHF ?? 1 
+        });
+      } catch (error) { 
+          console.error("Rate fetch error", error); 
+          setRates({ CHF: 1, EUR: 1, USD: 1 });
+      }
     };
     fetchRates();
   }, []);
