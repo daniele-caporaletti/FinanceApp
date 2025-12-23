@@ -63,10 +63,9 @@ const Icons = {
       <line x1="12" y1="15" x2="12" y2="15.01" strokeWidth="3" />
     </svg>
   ),
-  Investimenti: (
+  Portfolio: (
     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-      <polyline points="16 7 22 7 22 13" />
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   ),
   SpeseEssenziali: (
@@ -153,13 +152,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, isSyncing }) => {
         title: "Patrimonio",
         items: [
             { section: AppSection.Conti, label: 'Conti', icon: Icons.Conti },
-            { section: AppSection.Investimenti, label: 'Investimenti', icon: Icons.Investimenti },
+            { section: AppSection.Portfolio, label: 'Portfolio', icon: Icons.Portfolio },
         ]
     },
     {
         title: "Strumenti",
         items: [
-            { section: AppSection.SpeseEssenziali, label: 'Spese Essenziali', icon: Icons.SpeseEssenziali },
+            { section: AppSection.SpeseEssenziali, label: 'Pianificazione', icon: Icons.SpeseEssenziali },
             { section: AppSection.Categorie, label: 'Categorie', icon: Icons.Categorie },
             { section: AppSection.Tag, label: 'Tag', icon: Icons.Tag },
         ]
@@ -168,8 +167,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, isSyncing }) => {
 
   const mobileSheetItems = [
     { section: AppSection.Conti, label: 'Conti', icon: Icons.Conti },
-    { section: AppSection.Investimenti, label: 'Investimenti', icon: Icons.Investimenti },
-    { section: AppSection.SpeseEssenziali, label: 'Spese Essenziali', icon: Icons.SpeseEssenziali },
+    { section: AppSection.Portfolio, label: 'Portfolio', icon: Icons.Portfolio },
+    { section: AppSection.SpeseEssenziali, label: 'Pianificazione', icon: Icons.SpeseEssenziali },
     { section: AppSection.Categorie, label: 'Categorie', icon: Icons.Categorie },
     { section: AppSection.Tag, label: 'Tag', icon: Icons.Tag },
   ];

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { FinanceProvider, useFinance } from './FinanceContext';
 import { NavigationProvider, useNavigation } from './NavigationContext';
@@ -9,7 +10,7 @@ import { Transactions } from './pages/Transactions';
 import { Accounts } from './pages/Accounts';
 import { Categories } from './pages/Categories';
 import { Tags } from './pages/Tags';
-import { Investments } from './pages/Investments';
+import { Portfolio } from './pages/Portfolio'; 
 import { Recurrences } from './pages/Recurrences';
 import { Analysis } from './pages/Analysis';
 import { Login } from './pages/Login';
@@ -59,7 +60,7 @@ const AppContent: React.FC = () => {
       case AppSection.Conti: return <Accounts />;
       case AppSection.Categorie: return <Categories />;
       case AppSection.Tag: return <Tags />;
-      case AppSection.Investimenti: return <Investments />;
+      case AppSection.Portfolio: return <Portfolio />;
       case AppSection.SpeseEssenziali: return <Recurrences />;
       case AppSection.Analisi: return <Analysis />;
       default: return <Dashboard />;

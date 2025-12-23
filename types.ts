@@ -5,7 +5,9 @@ export interface Account {
   name: string;
   currency_code: string;
   status: string;
+  kind: 'cash' | 'pocket' | 'invest' | 'pension';
   exclude_from_overview: boolean;
+  note: string | null;
 }
 
 export interface Category {
@@ -20,44 +22,41 @@ export interface Transaction {
   id: string;
   user_id: string;
   occurred_on: string;
-  kind: 'income' | 'expense' | 'transfer' | string;
+  // Updated kinds based on user specific list
+  kind: 
+    | 'expense_personal' 
+    | 'expense_essential' 
+    | 'expense_work'
+    | 'income_personal'
+    | 'income_essential'
+    | 'income_work'
+    | 'income_pension'
+    | 'transfer_generic' 
+    | 'transfer_budget' 
+    | 'transfer_pocket' 
+    | 'transfer_invest' 
+    | 'transfer_pension' 
+    | 'adjustment'
+    | string; // Keep string for legacy/migration safety
   account_id: string;
   amount_original: number;
   amount_base: number;
   category_id: string | null;
   tag: string | null;
   description: string | null;
-  essential_transaction_id: string | null; // Foreign Key
+  essential_transaction_id: string | null;
 }
 
 export interface EssentialTransaction {
   id: string;
   user_id: string;
   name: string;
-  is_ready: boolean; // Renamed from is_active
   occurred_on: string; 
   kind: 'income' | 'expense' | 'transfer' | string;
   amount_original: number;
-  currency_original: string; // Rinominato per corrispondere al DB
+  currency_original: string;
   category_id: string | null;
-  description: string | null; // Note
-}
-
-export interface Investment {
-  id: string;
-  user_id: string;
-  name: string;
-  is_for_retirement: boolean;
-  currency: string;
-  note: string | null;
-}
-
-export interface InvestmentTrend {
-  id: string;
-  investment_id: string;
-  value_on: string; 
-  cash_flow: number; 
-  value_original: number; 
+  description: string | null;
 }
 
 export interface FinanceData {
@@ -65,8 +64,6 @@ export interface FinanceData {
   categories: Category[];
   transactions: Transaction[];
   essentialTransactions: EssentialTransaction[];
-  investments: Investment[];
-  investmentTrends: InvestmentTrend[];
   isSyncing: boolean;
   error: string | null;
 }
@@ -77,7 +74,7 @@ export enum AppSection {
   Tag = 'tag',
   Conti = 'conti',
   Categorie = 'categorie',
-  Investimenti = 'investimenti',
+  Portfolio = 'portfolio',
   Analisi = 'analisi',
   SpeseEssenziali = 'spese_essenziali'
 }

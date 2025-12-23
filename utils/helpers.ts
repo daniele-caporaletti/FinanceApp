@@ -11,15 +11,18 @@ export const fetchExchangeRate = async (date: string, from: string, to: string):
   const queryDate = date > today ? 'latest' : date;
   
   try {
-    const response = await fetch(`https://api.frankfurter.app/${queryDate}?from=${from}&to=${to}`);
+    // Utilizza endpoint v1 come richiesto: https://api.frankfurter.dev/v1/{date}?base={from}&symbols={to}
+    const response = await fetch(`https://api.frankfurter.dev/v1/${queryDate}?base=${from}&symbols=${to}`);
+    
     if (!response.ok) throw new Error('Rate fetch failed');
+    
     const data = await response.json();
     return data.rates[to];
   } catch (e) {
     try {
         // Fallback su latest se la chiamata con data specifica fallisce
         console.warn(`Rate fetch failed for date ${date}, trying latest.`);
-        const response = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
+        const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`);
         const data = await response.json();
         return data.rates[to];
     } catch (e2) {

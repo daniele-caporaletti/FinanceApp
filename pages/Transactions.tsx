@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useFinance } from '../FinanceContext';
 import { useNavigation } from '../NavigationContext';
@@ -53,12 +54,28 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     return accounts.filter(a => a.status === 'active');
   }, [accounts]);
 
-  // Options prep
+  // Updated Options based on User List
   const typeOptions = [
-    { value: 'essential', label: 'Essential' },
-    { value: 'personal', label: 'Personal' },
-    { value: 'work', label: 'Work' },
-    { value: 'transfer', label: 'Giroconto' }
+    // Uscite
+    { value: 'expense_personal', label: 'Uscita: Personale' },
+    { value: 'expense_essential', label: 'Uscita: Essenziale' },
+    { value: 'expense_work', label: 'Uscita: Lavoro' },
+    
+    // Entrate
+    { value: 'income_personal', label: 'Entrata: Personale' },
+    { value: 'income_essential', label: 'Entrata: Essenziale' },
+    { value: 'income_work', label: 'Entrata: Lavoro' },
+    { value: 'income_pension', label: 'Entrata: Pensione' },
+    
+    // Trasferimenti
+    { value: 'transfer_generic', label: 'Transfer: Generico' },
+    { value: 'transfer_budget', label: 'Transfer: Budget (Provvista)' },
+    { value: 'transfer_pocket', label: 'Transfer: Pocket (Risparmio)' },
+    { value: 'transfer_invest', label: 'Transfer: Investimento' },
+    { value: 'transfer_pension', label: 'Transfer: Pensione' },
+    
+    // Altro
+    { value: 'adjustment', label: 'Rettifica Valore' }
   ];
 
   const accountOptions = visibleAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.currency_code})` }));
@@ -73,7 +90,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const initialKind = initialData?.kind || 'essential';
+      const initialKind = initialData?.kind || 'expense_personal';
       setFormData(initialData || {
         occurred_on: new Date().toISOString().split('T')[0],
         kind: initialKind,
@@ -97,6 +114,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to determine if it acts as a transfer (no category/tag needed usually)
+  const isTransferKind = (k: string | undefined) => k?.startsWith('transfer_') || k === 'transfer';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.account_id) {
@@ -115,26 +135,27 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       let finalCategoryId = formData.category_id;
       let finalTag = formData.tag;
 
-      // MODIFICATO: Se è transfer, amount_base è sempre 0 e puliamo categoria/tag.
-      if (formData.kind === 'transfer') {
-          baseAmount = 0;
+      // 1. CALCOLO SEMPRE L'AMOUNT BASE (Anche per Transfer)
+      if (currency === 'CHF') {
+          baseAmount = originalAmount;
+      } else {
+          // Usa la nuova funzione API aggiornata
+          const rate = await fetchExchangeRate(date, currency, 'CHF');
+          baseAmount = originalAmount * rate;
+      }
+      // Arrotondamento a 2 decimali
+      baseAmount = Math.round(baseAmount * 100) / 100;
+
+      // 2. Pulizia UI (Se è transfer, rimuovi categoria/tag se presenti per errore, o lasciali opzionali)
+      if (isTransferKind(formData.kind)) {
           finalCategoryId = null;
           finalTag = null;
-      } else {
-          if (currency === 'CHF') {
-              baseAmount = originalAmount;
-          } else {
-              const rate = await fetchExchangeRate(date, currency, 'CHF');
-              baseAmount = originalAmount * rate;
-          }
-          // Arrotondamento
-          baseAmount = Math.round(baseAmount * 100) / 100;
       }
 
       await onSave({ 
           ...formData, 
           amount_original: originalAmount, 
-          amount_base: baseAmount,
+          amount_base: baseAmount, // Salviamo il controvalore calcolato
           category_id: finalCategoryId,
           tag: finalTag
       });
@@ -144,7 +165,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const selectedAccount = accounts.find(a => a.id === formData.account_id);
   const currencyLabel = selectedAccount?.currency_code || 'CHF';
-  const isTransfer = formData.kind === 'transfer';
+  const isTransferUI = isTransferKind(formData.kind);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
@@ -189,14 +210,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
           </div>
           
-          {!isTransfer && (
+          {!isTransferUI && (
             <div className="grid grid-cols-2 gap-6">
                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Categoria</label><CustomSelect value={selectedParentId} onChange={(val) => { setSelectedParentId(val); setFormData(f => ({ ...f, category_id: val || null })); }} options={[{value: '', label: 'Seleziona...'}, ...mainCategoryOptions]} searchable /></div>
                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sottocategoria</label><CustomSelect value={formData.category_id} onChange={(val) => setFormData(f => ({ ...f, category_id: val }))} options={subCategoryOptions} disabled={!selectedParentId} /></div>
             </div>
           )}
 
-          {!isTransfer && (
+          {!isTransferUI && (
             <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tag</label><input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500" placeholder="es. vacanze..." value={formData.tag || ''} onChange={e => setFormData(f => ({ ...f, tag: e.target.value }))} /></div>
           )}
 
@@ -422,7 +443,14 @@ export const Transactions: React.FC = () => {
     }).sort((a, b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime());
   }, [transactions, filters, categoryMap, accountMap]);
 
-  const typeOptions = ['essential', 'personal', 'work', 'transfer'];
+  // Group types for filter UI
+  const typeGroups = [
+    { label: 'Uscite', options: ['expense_personal', 'expense_essential', 'expense_work'] },
+    { label: 'Entrate', options: ['income_personal', 'income_essential', 'income_work', 'income_pension'] },
+    { label: 'Trasferimenti', options: ['transfer_generic', 'transfer_budget', 'transfer_pocket', 'transfer_invest', 'transfer_pension'] },
+    { label: 'Altro', options: ['adjustment'] }
+  ];
+  
   const accountOptions = Array.from(new Set(accounts.filter(a => a.status === 'active').map(a => a.name)));
   
   const tagOptions = Array.from(new Set(transactions.map(t => t.tag).filter(Boolean) as string[]));
@@ -440,8 +468,32 @@ export const Transactions: React.FC = () => {
   const resetFilters = () => setFilters({ search: '', types: [], accounts: [], category: '', subcategory: '', tag: '', year: currentYear, months: [], amountSign: 'all' });
 
   const getKindBadge = (kind: string) => {
-    const styles: any = { personal: "text-indigo-600 bg-indigo-50 border-indigo-100", essential: "text-rose-600 bg-rose-50 border-rose-100", work: "text-amber-600 bg-amber-50 border-amber-100", transfer: "text-blue-600 bg-blue-50 border-blue-100" };
-    return <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${styles[kind] || "bg-slate-50 text-slate-500 border-slate-200"}`}>{kind}</span>;
+    const map: Record<string, { label: string, style: string }> = {
+        // Expenses
+        expense_personal: { label: 'Personal', style: "text-rose-600 bg-rose-50 border-rose-100" },
+        expense_essential: { label: 'Essential', style: "text-rose-800 bg-rose-100 border-rose-200" },
+        expense_work: { label: 'Work', style: "text-amber-600 bg-amber-50 border-amber-100" },
+        
+        // Incomes
+        income_personal: { label: 'Income', style: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+        income_essential: { label: 'Inc. Ess.', style: "text-emerald-800 bg-emerald-100 border-emerald-200" },
+        income_work: { label: 'Work Inc.', style: "text-amber-700 bg-amber-100 border-amber-200" },
+        income_pension: { label: 'Pension', style: "text-indigo-600 bg-indigo-50 border-indigo-100" },
+        
+        // Transfers
+        transfer_generic: { label: 'Transfer', style: "text-blue-600 bg-blue-50 border-blue-100" },
+        transfer_budget: { label: 'Budget', style: "text-cyan-600 bg-cyan-50 border-cyan-100" },
+        transfer_pocket: { label: 'Pocket', style: "text-indigo-500 bg-indigo-50 border-indigo-100" },
+        transfer_invest: { label: 'Invest', style: "text-emerald-700 bg-emerald-100 border-emerald-200" },
+        transfer_pension: { label: 'T. Pension', style: "text-indigo-700 bg-indigo-100 border-indigo-200" },
+        
+        // Adjustment
+        adjustment: { label: 'Adjust', style: "text-slate-600 bg-slate-100 border-slate-200" }
+    };
+
+    const config = map[kind] || { label: kind, style: "bg-slate-50 text-slate-500 border-slate-200" };
+    
+    return <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap ${config.style}`}>{config.label}</span>;
   };
 
   // Helper per generare il contenuto del messaggio di eliminazione
@@ -519,46 +571,88 @@ export const Transactions: React.FC = () => {
         </div>
       </div>
 
-      {/* Pannello Filtri Collassabile - COMPACT */}
+      {/* Pannello Filtri Collassabile - Riorganizzato */}
       {showFilters && (
-        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 mb-6 relative z-20 animate-in slide-in-from-top-4 fade-in duration-300">
-            <div className="px-6 py-5 bg-[#fcfdfe] border-b border-slate-100 rounded-t-[2rem] flex flex-wrap gap-2">
-                {monthNames.map((m, i) => <button key={m} onClick={() => toggleMultiSelect('months', i + 1)} className={`flex-1 min-w-[50px] py-2 text-[10px] font-bold rounded-xl border transition-all uppercase ${filters.months.includes(i + 1) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>{m}</button>)}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 mb-6 relative z-20 animate-in slide-in-from-top-4 fade-in duration-300 overflow-hidden">
+            {/* Months Row */}
+            <div className="px-6 py-4 bg-[#fcfdfe] border-b border-slate-100 flex flex-wrap gap-2">
+                {monthNames.map((m, i) => (
+                    <button 
+                        key={m} 
+                        onClick={() => toggleMultiSelect('months', i + 1)} 
+                        className={`flex-1 min-w-[50px] py-2 text-[10px] font-bold rounded-xl border transition-all uppercase ${filters.months.includes(i + 1) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}
+                    >
+                        {m}
+                    </button>
+                ))}
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                {/* Compact Classification */}
-                <div className="space-y-3 relative z-50">
-                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                        <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} searchable />
-                        <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
-                    </div>
-                    <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} searchable />
-                </div>
+
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/* Compact Types */}
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Tipo</h4>
-                    <div className="flex flex-wrap gap-2">
-                        {typeOptions.map(t => <button key={t} onClick={() => toggleMultiSelect('types', t)} className={`px-4 py-2 text-[10px] font-bold rounded-full border uppercase transition-colors ${filters.types.includes(t) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>{t}</button>)}
+                {/* COLUMN 1: Classification & Sign (Span 3) */}
+                <div className="lg:col-span-3 space-y-6">
+                    {/* Classification */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Classificazione</h4>
+                        <div className="space-y-2">
+                            <CustomSelect value={filters.category} onChange={(val) => setFilters(f => ({ ...f, category: val, subcategory: '' }))} options={[{value: '', label: 'Categoria: Tutte'}, ...mainCategories.map(c => ({value: c.name, label: c.name}))]} searchable />
+                            <CustomSelect value={filters.subcategory} onChange={(val) => setFilters(f => ({ ...f, subcategory: val }))} options={[{value: '', label: 'Sottocategoria'}, ...subCategoryOptions.map(s => ({value: s, label: s}))]} disabled={!filters.category} />
+                            <CustomSelect value={filters.tag} onChange={(val) => setFilters(f => ({ ...f, tag: val }))} options={[{value: '', label: 'Tag'}, ...tagOptions.map(t => ({value: t, label: t}))]} searchable />
+                        </div>
+                    </div>
+
+                    <div className="w-full h-px bg-slate-100 hidden lg:block"></div>
+
+                    {/* Sign */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Segno Importo</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button onClick={() => setFilters(f => ({ ...f, amountSign: 'all' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Tutti</button>
+                            <button onClick={() => setFilters(f => ({ ...f, amountSign: 'positive' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'positive' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Entrate</button>
+                            <button onClick={() => setFilters(f => ({ ...f, amountSign: 'negative' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'negative' ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Uscite</button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Segno Importo</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => setFilters(f => ({ ...f, amountSign: 'all' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Tutti</button>
-                        <button onClick={() => setFilters(f => ({ ...f, amountSign: 'positive' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'positive' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Entrate</button>
-                        <button onClick={() => setFilters(f => ({ ...f, amountSign: 'negative' }))} className={`py-2 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wide ${filters.amountSign === 'negative' ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>Uscite</button>
+                {/* COLUMN 2: Types (Span 6) - Organized in Groups */}
+                <div className="lg:col-span-6 space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Tipologia</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
+                        {typeGroups.map(group => (
+                            <div key={group.label} className="space-y-2.5">
+                                <h5 className="text-[9px] font-bold text-slate-300 uppercase border-b border-slate-100 pb-1">{group.label}</h5>
+                                <div className="flex flex-wrap gap-2">
+                                    {group.options.map(t => (
+                                        <button 
+                                            key={t} 
+                                            onClick={() => toggleMultiSelect('types', t)} 
+                                            className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all uppercase tracking-wide ${filters.types.includes(t) ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
+                                        >
+                                            {t.replace(/_/g, ' ').replace('expense ', '').replace('income ', '').replace('transfer ', '')}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-                
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Conti</h4>
-                    <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar">
-                        {accountOptions.map(a => <button key={a} onClick={() => toggleMultiSelect('accounts', a)} className={`px-3 py-2 text-[10px] font-bold rounded-xl border text-left truncate ${filters.accounts.includes(a) ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-slate-200 text-slate-400'}`}>{a}</button>)}
+
+                {/* COLUMN 3: Accounts (Span 3) - Flex Wrap Pills */}
+                <div className="lg:col-span-3 space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>Conti</h4>
+                    <div className="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto custom-scrollbar content-start">
+                        {accountOptions.map(a => (
+                            <button 
+                                key={a} 
+                                onClick={() => toggleMultiSelect('accounts', a)} 
+                                className={`px-3 py-2 text-[10px] font-bold rounded-xl border text-left truncate transition-all ${filters.accounts.includes(a) ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                            >
+                                {a}
+                            </button>
+                        ))}
                     </div>
                 </div>
+
             </div>
         </div>
       )}
@@ -582,7 +676,8 @@ export const Transactions: React.FC = () => {
                     {filteredTransactions.map(tx => {
                         const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
                         const acc = getAccountInfoFromMap(tx.account_id);
-                        const isTransfer = tx.kind === 'transfer';
+                        // Check if it's a transfer type (starts with transfer_) or strictly 'transfer'
+                        const isTransfer = tx.kind.startsWith('transfer_') || tx.kind === 'transfer';
                         const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
                         const isSameCurrency = acc.currency === 'CHF';
 
@@ -602,7 +697,7 @@ export const Transactions: React.FC = () => {
                                             {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} 
                                             <span className="text-[10px] opacity-60 ml-1">{acc.currency}</span>
                                         </span>
-                                        {!isSameCurrency && !isTransfer && (
+                                        {!isSameCurrency && (
                                             <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
                                                ≈ {(tx.amount_base || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} CHF
                                             </span>
@@ -617,7 +712,7 @@ export const Transactions: React.FC = () => {
                                 </td>
                                 <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">{tx.description || '-'}</td>
                                 <td className="px-4 py-3 text-right space-x-1">
-                                    {!isSameCurrency && !isTransfer && (
+                                    {!isSameCurrency && (
                                         <button 
                                             onClick={() => handleRefreshRate(tx, acc.currency)} 
                                             className="p-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -645,7 +740,7 @@ export const Transactions: React.FC = () => {
          {filteredTransactions.map(tx => {
             const { category, subcategory } = getCategoryInfoFromMap(tx.category_id);
             const acc = getAccountInfoFromMap(tx.account_id);
-            const isTransfer = tx.kind === 'transfer';
+            const isTransfer = tx.kind.startsWith('transfer_') || tx.kind === 'transfer';
             const amountColorClass = isTransfer ? 'text-blue-600' : (tx.amount_base || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600';
             const isSameCurrency = acc.currency === 'CHF';
             
@@ -669,7 +764,7 @@ export const Transactions: React.FC = () => {
                             {(tx.amount_original || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                             <span className="text-[9px] ml-0.5 opacity-60">{acc.currency}</span>
                         </span>
-                        {!isSameCurrency && !isTransfer && (
+                        {!isSameCurrency && (
                             <div className="flex items-center gap-1.5 mt-0.5 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100">
                                 <span className="text-[10px] font-bold text-slate-500">
                                     ≈ {(tx.amount_base || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} CHF
@@ -721,19 +816,93 @@ export const Transactions: React.FC = () => {
       />
       
       <FullScreenModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} title="Gestione Movimenti" subtitle="Help">
-        <div className="space-y-6">
-           <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100"><p className="text-sm text-blue-800 leading-relaxed font-medium">Questa sezione è il registro completo delle tue finanze. Qui puoi aggiungere, modificare e categorizzare ogni singola transazione.</p></div>
+        <div className="space-y-8">
+           {/* Intro */}
+           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  Questa sezione è il registro completo delle tue finanze. Ogni riga rappresenta una transazione che influisce sui saldi dei tuoi conti.
+               </p>
+           </div>
            
-           <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Azioni Mobile</h4>
+           {/* Legenda Tipologie */}
+           <div>
+               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-2">Legenda Tipologie</h4>
+               <div className="space-y-8">
+                  
+                  {/* Uscite */}
+                  <div className="space-y-3">
+                     <h5 className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-2">Uscite (Expenses)</h5>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-rose-600 bg-rose-50 border-rose-100 min-w-[70px] text-center">Personal</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Spese Personali:</strong> Uscite quotidiane variabili (es. Ristorante, Spesa, Viaggi). Influiscono sul "Net Balance" mensile.</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-rose-800 bg-rose-100 border-rose-200 min-w-[70px] text-center">Essential</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Spese Essenziali:</strong> Uscite fisse obbligatorie (es. Affitto, Bollette, Assicurazioni).</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-amber-600 bg-amber-50 border-amber-100 min-w-[70px] text-center">Work</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Spese Lavoro:</strong> Spese anticipate per lavoro (es. Pranzi aziendali). Vengono separate dalle statistiche personali.</p>
+                     </div>
+                  </div>
+
+                  {/* Entrate */}
+                  <div className="space-y-3">
+                     <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-2">Entrate (Incomes)</h5>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-emerald-600 bg-emerald-50 border-emerald-100 min-w-[70px] text-center">Income</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Stipendio/Entrate:</strong> Guadagni principali (es. Stipendio, Regali).</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-emerald-800 bg-emerald-100 border-emerald-200 min-w-[70px] text-center">Inc. Ess.</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Entrate Essenziali:</strong> Entrate ricorrenti fisse (es. Assegni familiari).</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-amber-700 bg-amber-100 border-amber-200 min-w-[70px] text-center">Work Inc.</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Rimborsi Lavoro:</strong> Quando l'azienda ti rimborsa una spesa 'Work'.</p>
+                     </div>
+                  </div>
+
+                  {/* Trasferimenti */}
+                  <div className="space-y-3">
+                     <h5 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">Trasferimenti (Transfers)</h5>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-cyan-600 bg-cyan-50 border-cyan-100 min-w-[70px] text-center">Budget</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Provvista Spese:</strong> Spostamento tecnico di denaro per coprire spese future (es. Giroconto su carta di credito).</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-indigo-500 bg-indigo-50 border-indigo-100 min-w-[70px] text-center">Pocket</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Risparmio:</strong> Accantonamento verso un conto deposito o "Pocket".</p>
+                     </div>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-emerald-700 bg-emerald-100 border-emerald-200 min-w-[70px] text-center">Invest</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Investimento:</strong> Versamento verso broker o conti investimento.</p>
+                     </div>
+                  </div>
+
+                  {/* Altro */}
+                  <div className="space-y-3">
+                     <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Altro</h5>
+                     <div className="flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap text-slate-600 bg-slate-100 border-slate-200 min-w-[70px] text-center">Adjust</span>
+                        <p className="text-xs text-slate-600 leading-snug"><strong>Rettifica Valore:</strong> Usato per allineare il saldo dei conti (es. Plusvalenza/Minusvalenza investimenti) senza movimentare denaro reale.</p>
+                     </div>
+                  </div>
+
+               </div>
+           </div>
+
+           {/* Azioni Mobile */}
+           <div className="pt-6 border-t border-slate-100">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Azioni Rapide (Mobile)</h4>
               <ul className="space-y-3">
                  <li className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg></div>
-                    <span className="text-sm text-slate-600">Scorri verso <strong>destra</strong> per Modificare.</span>
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-sm flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>destra</strong> su un movimento per Modificare.</span>
                  </li>
                  <li className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" /></svg></div>
-                    <span className="text-sm text-slate-600">Scorri verso <strong>sinistra</strong> per Eliminare.</span>
+                    <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white shadow-sm flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" /></svg></div>
+                    <span className="text-sm text-slate-600">Scorri verso <strong>sinistra</strong> su un movimento per Eliminare.</span>
                  </li>
               </ul>
            </div>

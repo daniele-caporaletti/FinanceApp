@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { FinanceData, Account, Category, Transaction, EssentialTransaction, Investment, InvestmentTrend } from './types';
+import { FinanceData, Account, Category, Transaction, EssentialTransaction } from './types';
 import { supabaseFetch, supabaseUpdate, supabaseInsert, supabaseDelete } from './supabaseService';
 import { useAuth } from './AuthContext';
 import { supabase } from './utils/supabase';
@@ -18,12 +18,6 @@ interface FinanceContextType extends FinanceData {
   addEssential: (rec: Partial<EssentialTransaction>) => Promise<void>;
   updateEssential: (id: string, updates: Partial<EssentialTransaction>) => Promise<void>;
   deleteEssential: (id: string) => Promise<void>;
-  addInvestment: (inv: Partial<Investment>) => Promise<void>;
-  updateInvestment: (id: string, updates: Partial<Investment>) => Promise<void>;
-  deleteInvestment: (id: string) => Promise<void>;
-  addTrend: (trend: Partial<InvestmentTrend>) => Promise<void>;
-  updateTrend: (id: string, updates: Partial<InvestmentTrend>) => Promise<void>;
-  deleteTrend: (id: string) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -36,8 +30,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     categories: [],
     transactions: [],
     essentialTransactions: [],
-    investments: [],
-    investmentTrends: [],
     isSyncing: true,
     error: null
   });
@@ -49,16 +41,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(prev => ({ ...prev, isSyncing: true, error: null }));
     
     try {
+      // Removed investments and investment_trends fetches
       const results = await Promise.allSettled([
         supabaseFetch<Account>('accounts'),
         supabaseFetch<Category>('categories'),
         supabaseFetch<Transaction>('transactions'),
-        supabaseFetch<Investment>('investment'),
-        supabaseFetch<InvestmentTrend>('investment_trends'),
         supabaseFetch<EssentialTransaction>('essential_transactions')
       ]);
 
-      const [resAcc, resCat, resTx, resInv, resTrends, resEss] = results;
+      const [resAcc, resCat, resTx, resEss] = results;
       
       const newData: Partial<FinanceData> = {};
       const errors: string[] = [];
@@ -68,7 +59,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return res.value;
         } else {
           console.error(`Failed to fetch ${name}:`, res.reason);
-          errors.push(`${name}: ${res.reason.message || 'Error'}`);
+          let reasonMsg = 'Unknown Error';
+          if (res.reason instanceof Error) {
+              reasonMsg = res.reason.message;
+          } else if (typeof res.reason === 'string') {
+              reasonMsg = res.reason;
+          } else {
+              try {
+                  reasonMsg = JSON.stringify(res.reason);
+              } catch {
+                  reasonMsg = String(res.reason);
+              }
+          }
+          errors.push(`${name}: ${reasonMsg}`);
           return [];
         }
       };
@@ -76,8 +79,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       newData.accounts = processResult(resAcc, 'accounts');
       newData.categories = processResult(resCat, 'categories');
       newData.transactions = processResult(resTx, 'transactions');
-      newData.investments = processResult(resInv, 'investment');
-      newData.investmentTrends = processResult(resTrends, 'investment_trends');
       newData.essentialTransactions = processResult(resEss, 'essential_transactions');
 
       setData(prev => ({
@@ -168,7 +169,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) { console.error("Failed to delete transaction:", err); throw err; }
   };
 
-  // --- ESSENTIAL TRANSACTIONS (Ex Recurring) ---
+  // --- ESSENTIAL TRANSACTIONS ---
   const addEssential = async (rec: Partial<EssentialTransaction>) => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) throw new Error("Utente non autenticato");
@@ -192,52 +193,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) { console.error("Failed to delete essential:", err); throw err; }
   };
 
-  // --- INVESTMENTS ---
-  const addInvestment = async (inv: Partial<Investment>) => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) throw new Error("Utente non autenticato");
-    try {
-      const newInv = await supabaseInsert<Investment>('investment', { ...inv, user_id: currentUser.id });
-      setData(prev => ({ ...prev, investments: [...prev.investments, newInv] }));
-    } catch (err) { console.error("Failed to add investment:", err); throw err; }
-  };
-
-  const updateInvestment = async (id: string, updates: Partial<Investment>) => {
-    try {
-      setData(prev => ({ ...prev, investments: prev.investments.map(inv => inv.id === id ? { ...inv, ...updates } : inv) }));
-      await supabaseUpdate('investment', id, updates);
-    } catch (err) { console.error("Failed to update investment:", err); throw err; }
-  };
-
-  const deleteInvestment = async (id: string) => {
-    try {
-      await supabaseDelete('investment', id);
-      setData(prev => ({ ...prev, investments: prev.investments.filter(inv => inv.id !== id) }));
-    } catch (err) { console.error("Failed to delete investment:", err); throw err; }
-  };
-
-  // --- INVESTMENT TRENDS ---
-  const addTrend = async (trend: Partial<InvestmentTrend>) => {
-    try {
-      const newTrend = await supabaseInsert<InvestmentTrend>('investment_trends', trend);
-      setData(prev => ({ ...prev, investmentTrends: [...prev.investmentTrends, newTrend] }));
-    } catch (err) { console.error("Failed to add trend:", err); throw err; }
-  };
-
-  const updateTrend = async (id: string, updates: Partial<InvestmentTrend>) => {
-    try {
-      setData(prev => ({ ...prev, investmentTrends: prev.investmentTrends.map(t => t.id === id ? { ...t, ...updates } : t) }));
-      await supabaseUpdate('investment_trends', id, updates);
-    } catch (err) { console.error("Failed to update trend:", err); throw err; }
-  };
-
-  const deleteTrend = async (id: string) => {
-    try {
-      await supabaseDelete('investment_trends', id);
-      setData(prev => ({ ...prev, investmentTrends: prev.investmentTrends.filter(t => t.id !== id) }));
-    } catch (err) { console.error("Failed to delete trend:", err); throw err; }
-  };
-
   useEffect(() => {
     if (user) {
         syncData();
@@ -251,9 +206,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateAccount, addAccount, 
       addCategory, updateCategory, deleteCategory,
       addTransaction, updateTransaction, deleteTransaction,
-      addEssential, updateEssential, deleteEssential,
-      addInvestment, updateInvestment, deleteInvestment,
-      addTrend, updateTrend, deleteTrend
+      addEssential, updateEssential, deleteEssential
     }}>
       {children}
     </FinanceContext.Provider>

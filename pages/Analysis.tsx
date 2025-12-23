@@ -1,568 +1,817 @@
-import React, { useMemo, useState, useEffect } from 'react';
+
+import React, { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
+import { CustomSelect } from '../components/CustomSelect';
+import { FullScreenModal } from '../components/FullScreenModal';
+import { Transaction } from '../types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell 
+  PieChart, Pie, Cell
 } from 'recharts';
-import { FullScreenModal } from '../components/FullScreenModal';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+// --- CONFIGURAZIONE COLORI ---
+const C = {
+  income: '#10b981',      // Emerald 500
+  fixed: '#be123c',       // Rose 700 (Spese Fisse - Essential)
+  variable: '#f43f5e',    // Rose 500 (Spese Variabili - Personal)
+  invest: '#059669',      // Emerald 600
+  pension: '#d97706',     // Amber 600
+  pocket: '#3b82f6',      // Blue 500
+  surplus: '#94a3b8',     // Slate 400 (Liquidità rimanente)
+};
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+
+// --- HELPER FORMATTAZIONE ---
+const formatCHF = (val: number) => val.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// --- TOOLTIP GRAFICI ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl z-50">
+        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+           <div key={index} className="text-xs font-bold flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }}></div>
+              <span className="text-slate-600">{entry.name}:</span>
+              <span className="text-slate-900">{formatCHF(entry.value)}</span>
+           </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// --- MODALE DRILL-DOWN ---
+interface DrillDownModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    transactions: Transaction[];
+    total: number;
+    colorClass: string;
+}
+
+const DrillDownModal: React.FC<DrillDownModalProps> = ({ isOpen, onClose, title, transactions, total, colorClass }) => {
+    if (!isOpen) return null;
+
+    return (
+        <FullScreenModal isOpen={isOpen} onClose={onClose} title={title} subtitle="Dettaglio Movimenti">
+            <div className="space-y-6">
+                <div className="flex justify-between items-end border-b border-slate-100 pb-4">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Totale Periodo</span>
+                    <span className={`text-2xl font-black ${colorClass}`}>{formatCHF(total)} <span className="text-sm text-slate-300">CHF</span></span>
+                </div>
+                
+                <div className="space-y-2">
+                    {transactions.length > 0 ? transactions.map(tx => {
+                        const amount = tx.amount_base || 0;
+                        const isPositive = amount >= 0;
+                        
+                        return (
+                            <div key={tx.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs font-bold text-slate-800">{new Date(tx.occurred_on).toLocaleDateString('it-IT')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 font-medium truncate max-w-[180px]">{tx.description || tx.kind}</span>
+                                        {tx.tag && <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold text-slate-400 uppercase">{tx.tag}</span>}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className={`text-sm font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {isPositive ? '+' : ''}{formatCHF(amount)}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    }) : (
+                        <div className="text-center py-12 text-slate-400 text-sm font-medium italic">Nessun movimento trovato per i criteri selezionati.</div>
+                    )}
+                </div>
+            </div>
+        </FullScreenModal>
+    );
+};
 
 export const Analysis: React.FC = () => {
-  const { transactions, categories, accounts, investments, investmentTrends } = useFinance();
-  const currentYear = new Date().getFullYear();
+  const { transactions, categories, accounts } = useFinance();
+  const currentRealDate = new Date();
   
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all');
+  const [selectedYear, setSelectedYear] = useState<number>(currentRealDate.getFullYear());
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   
-  // Tassi di cambio per il calcolo del patrimonio (Storici)
-  const [rates, setRates] = useState<Record<string, number>>({ CHF: 1, EUR: 1, USD: 1 });
+  // Drill Down State
+  const [drillState, setDrillState] = useState<{
+      open: boolean;
+      title: string;
+      data: Transaction[];
+      total: number;
+      color: string;
+  }>({ open: false, title: '', data: [], total: 0, color: 'text-slate-900' });
 
-  // Stato per gestire l'espansione delle sottocategorie nel dettaglio
-  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
-
-  const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
-
-  useEffect(() => {
-    const fetchRates = async () => {
-      let dateStr = '';
-      const today = new Date().toISOString().split('T')[0];
-
-      if (selectedMonth === 'all') {
-          dateStr = `${selectedYear}-12-31`;
-      } else {
-          const lastDay = new Date(selectedYear, selectedMonth + 1, 0); 
-          const y = lastDay.getFullYear();
-          const m = String(lastDay.getMonth() + 1).padStart(2, '0');
-          const d = String(lastDay.getDate()).padStart(2, '0');
-          dateStr = `${y}-${m}-${d}`;
-      }
-
-      // Usa 'latest' se la data è futura
-      const queryDate = dateStr > today ? 'latest' : dateStr;
-
-      try {
-        const [resEur, resUsd] = await Promise.all([
-          fetch(`https://api.frankfurter.app/${queryDate}?from=EUR&to=CHF`),
-          fetch(`https://api.frankfurter.app/${queryDate}?from=USD&to=CHF`)
-        ]);
-        const dataEur = await resEur.json();
-        const dataUsd = await resUsd.json();
-        setRates({ CHF: 1, EUR: dataEur.rates.CHF, USD: dataUsd.rates.CHF });
-      } catch (error) { console.error("Rate fetch error", error); }
-    };
-    fetchRates();
-  }, [selectedYear, selectedMonth]);
-
-  const toggleDetail = (categoryName: string) => {
-    setExpandedDetails(prev => {
-        const next = new Set(prev);
-        if (next.has(categoryName)) next.delete(categoryName);
-        else next.add(categoryName);
-        return next;
-    });
-  };
-
-  // 0. Calcolo Patrimonio Storico (Liquidità + Investimenti Personali)
-  const historicWealth = useMemo(() => {
-      // Determina la data di taglio (cutoff)
-      let cutoffDateStr = '';
-      let displayDateLabel = '';
-
-      if (selectedMonth === 'all') {
-          cutoffDateStr = `${selectedYear}-12-31`;
-          displayDateLabel = `31 Dicembre ${selectedYear}`;
-      } else {
-          const lastDay = new Date(selectedYear, selectedMonth + 1, 0); 
-          const y = lastDay.getFullYear();
-          const m = String(lastDay.getMonth() + 1).padStart(2, '0');
-          const d = String(lastDay.getDate()).padStart(2, '0');
-          cutoffDateStr = `${y}-${m}-${d}`;
-          displayDateLabel = `${d} ${monthNames[selectedMonth]} ${selectedYear}`;
-      }
-
-      // A. LIQUIDITA (Somma transazioni)
-      const accountBalances: Record<string, number> = {};
-      transactions.forEach(t => {
-          if (t.occurred_on <= cutoffDateStr) {
-              const amount = t.amount_original || 0;
-              accountBalances[t.account_id] = (accountBalances[t.account_id] || 0) + amount;
-          }
-      });
-
-      let liquidityCHF = 0;
-      accounts.forEach(acc => {
-          const balance = accountBalances[acc.id] || 0;
-          const rate = rates[acc.currency_code] || 1;
-          liquidityCHF += balance * rate;
-      });
-
-      // B. INVESTIMENTI PERSONALI (Valore storico)
-      let investmentsCHF = 0;
-      // Filtra solo investimenti personali (non pensione)
-      const personalInvestments = investments.filter(inv => !inv.is_for_retirement);
-      
-      personalInvestments.forEach(inv => {
-          // Trova tutti i trend per questo investimento
-          const trends = investmentTrends.filter(t => t.investment_id === inv.id);
-          
-          // Trova il trend più recente valido (<= cutoffDate)
-          // Ordiniamo per data decrescente e prendiamo il primo che soddisfa la condizione
-          const validTrend = trends
-              .filter(t => t.value_on <= cutoffDateStr)
-              .sort((a, b) => new Date(b.value_on).getTime() - new Date(a.value_on).getTime())[0];
-
-          if (validTrend) {
-              const rate = rates[inv.currency] || 1;
-              investmentsCHF += (validTrend.value_original || 0) * rate;
-          }
-      });
-
-      return { 
-          total: liquidityCHF + investmentsCHF, 
-          liquidity: liquidityCHF,
-          investments: investmentsCHF,
-          dateLabel: displayDateLabel 
-      };
-  }, [transactions, accounts, investments, investmentTrends, rates, selectedYear, selectedMonth]);
-
-  // 1. Data Filtering (Core Logic: No Work, No Transfer)
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      // Exclude logic
-      if (t.kind === 'work' || t.kind === 'transfer') return false;
-
-      const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
-      const yearMatch = tYear === selectedYear;
-      const monthMatch = selectedMonth === 'all' || (tMonth - 1) === selectedMonth;
-
-      return yearMatch && monthMatch;
-    });
-  }, [transactions, selectedYear, selectedMonth]);
-
-  // 2. Available Years
+  // --- SELETTORI ---
   const availableYears = useMemo(() => {
     const years = transactions.map(t => parseInt(t.occurred_on.split('-')[0]));
     const unique = Array.from(new Set(years));
-    if (!unique.includes(currentYear)) unique.push(currentYear);
-    return unique.sort((a: number, b: number) => b - a);
-  }, [transactions, currentYear]);
+    if (!unique.includes(currentRealDate.getFullYear())) unique.push(currentRealDate.getFullYear());
+    return unique.sort((a, b) => b - a);
+  }, [transactions]);
 
-  // 3. KPI Calculations
-  const kpi = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+  const yearOptions = useMemo(() => availableYears.map(y => ({ value: String(y), label: String(y) })), [availableYears]);
 
-    filteredTransactions.forEach(t => {
-      const amt = t.amount_base || 0;
-      // Normalizzazione: Entrate positive, Spese negative nel DB ma le sommiamo in assoluto per i KPI
-      if (amt > 0) income += amt;
-      else expense += Math.abs(amt);
-    });
+  // --- MAP ACCOUNT TYPES ---
+  const accountTypeMap = useMemo(() => {
+      const map = new Map<string, 'cash' | 'pocket' | 'invest' | 'pension'>();
+      accounts.forEach(a => map.set(a.id, a.kind));
+      return map;
+  }, [accounts]);
 
-    const savings = income - expense;
-    const savingsRate = income > 0 ? (savings / income) * 100 : 0;
+  // --- CALCOLO SALDI DI FINE ANNO (BALANCE SHEET) ---
+  const yearEndBalances = useMemo(() => {
+      const balances: Record<string, number> = {};
+      
+      // Inizializza tutti i conti a 0
+      accounts.forEach(a => balances[a.id] = 0);
 
-    return { income, expense, savings, savingsRate };
-  }, [filteredTransactions]);
+      // Somma tutte le transazioni FINO alla fine dell'anno selezionato
+      transactions.forEach(t => {
+          const tYear = parseInt(t.occurred_on.split('-')[0]);
+          if (tYear <= selectedYear) {
+              const amount = t.amount_base || 0;
+              // Logica di segno standard: expense è negativo, income positivo
+              let val = amount;
+              if (t.kind.startsWith('expense') && amount > 0) val = -amount;
+              else if (t.kind.startsWith('income') && amount < 0) val = Math.abs(amount); // Correzione difensiva
+              
+              if (['expense_personal', 'expense_essential', 'expense_work'].includes(t.kind)) {
+                  val = -Math.abs(amount);
+              } else if (['income_personal', 'income_essential', 'income_work', 'income_pension'].includes(t.kind)) {
+                  val = Math.abs(amount);
+              } else {
+                  val = amount; // transfer, adjustment hanno segno proprio
+              }
 
-  // 4. Chart Data: Monthly Trend (Only if 'all' months selected)
-  const trendData = useMemo(() => {
-    if (selectedMonth !== 'all') return []; // No trend if single month
+              balances[t.account_id] = (balances[t.account_id] || 0) + val;
+          }
+      });
 
-    const data = Array.from({ length: 12 }, (_, i) => ({
-      name: monthNames[i],
-      Income: 0,
-      Expense: 0,
-      Savings: 0
+      // Dividi in gruppi
+      const liquidityAccounts = accounts.filter(a => (a.kind === 'cash' || a.kind === 'pocket') && a.status === 'active');
+      const wealthAccounts = accounts.filter(a => (a.kind === 'invest' || a.kind === 'pension') && a.status === 'active');
+
+      const liquidityList = liquidityAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a,b) => b.balance - a.balance);
+      const wealthList = wealthAccounts.map(a => ({ name: a.name, kind: a.kind, balance: balances[a.id] || 0 })).sort((a,b) => b.balance - a.balance);
+
+      const totalLiquidity = liquidityList.reduce((acc, curr) => acc + curr.balance, 0);
+      const totalWealth = wealthList.reduce((acc, curr) => acc + curr.balance, 0);
+
+      return { liquidityList, wealthList, totalLiquidity, totalWealth };
+  }, [accounts, transactions, selectedYear]);
+
+
+  // --- MOTORE DATI FLUSSI (CASHFLOW) ---
+  const analysisData = useMemo(() => {
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      name: new Date(0, i).toLocaleString('it-IT', { month: 'short' }),
+      monthIdx: i,
+      income: 0,
+      expenseFixed: 0,
+      expenseVariable: 0,
+      saved: 0 
     }));
 
-    transactions.filter(t => {
-        if (t.kind === 'work' || t.kind === 'transfer') return false;
-        return parseInt(t.occurred_on.split('-')[0]) === selectedYear;
-    }).forEach(t => {
-        const [tYear, tMonth] = t.occurred_on.split('-').map(Number);
-        const monthIdx = tMonth - 1;
-        const amt = t.amount_base || 0;
-        if (amt > 0) data[monthIdx].Income += amt;
-        else data[monthIdx].Expense += Math.abs(amt);
-    });
-    
-    // Calculate Net for chart
-    return data.map(d => ({ ...d, Savings: d.Income - d.Expense }));
-  }, [transactions, selectedYear, selectedMonth]);
+    // Accumulatori Liste (Per Drill-Down)
+    const lists = {
+        income: [] as Transaction[],
+        fixed: [] as Transaction[],
+        variable: [] as Transaction[],
+        invest: [] as Transaction[], // Moves to Wealth
+        pension: [] as Transaction[], // Moves to Wealth
+    };
 
-  // 5. Chart Data: Category Distribution (Pie Chart)
-  const categoryData = useMemo(() => {
-    const groups: Record<string, number> = {};
+    let totalIncome = 0;
+    let totalFixed = 0;
+    let totalVariable = 0;
     
-    filteredTransactions.forEach(t => {
-      // Consideriamo solo le spese per la torta
-      if ((t.amount_base || 0) >= 0) return;
+    // Flussi verso patrimonio (Soldi che escono dalla liquidità)
+    let flowToInvest = 0;
+    let flowToPension = 0;
 
-      const cat = categories.find(c => c.id === t.category_id);
-      let groupName = 'Altro';
-      
-      if (cat) {
-        if (cat.parent_id) {
-            const parent = categories.find(p => p.id === cat.parent_id);
-            groupName = parent ? parent.name : cat.name;
+    // Calcolo Liquidità Iniziale (Cash + Pocket)
+    let initialLiquidity = 0;
+    
+    // LOGICA LIQUIDITA' INIZIALE AGGIORNATA
+    transactions.forEach(t => {
+        const tYear = parseInt(t.occurred_on.split('-')[0]);
+        const accKind = accountTypeMap.get(t.account_id);
+        const isLiquidityAccount = accKind === 'cash' || accKind === 'pocket';
+
+        if (!isLiquidityAccount) return;
+
+        // Normalizzazione segno per il calcolo
+        let val = t.amount_base || 0;
+        if (t.kind.startsWith('expense')) val = -Math.abs(val);
+        else if (t.kind.startsWith('income')) val = Math.abs(val);
+        // Transfer e Adjustment mantengono il segno del DB
+
+        if (selectedYear === 2024) {
+            // REGOLA 2024 (Primo Anno): Conta solo le transazioni esplicite "Saldo Iniziale" del 2024
+            if (tYear === 2024 && t.description?.toLowerCase().includes('saldo iniziale')) {
+                initialLiquidity += val;
+            }
         } else {
-            groupName = cat.name;
+            // REGOLA ANNI SUCCESSIVI: Prendi il saldo finale di TUTTI gli anni precedenti
+            // Somma tutto ciò che è successo PRIMA dell'anno selezionato
+            if (tYear < selectedYear) {
+                initialLiquidity += val;
+            }
         }
-      }
-
-      if (!groups[groupName]) groups[groupName] = 0;
-      groups[groupName] += Math.abs(t.amount_base || 0);
     });
 
-    return Object.entries(groups)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [filteredTransactions, categories]);
+    // Categorie Spese (per Top 5)
+    const categoryMap: Record<string, number> = {};
 
-  // 6. Top Subcategories (Drill down list)
-  const topCategoriesList = useMemo(() => {
-     const list: { 
-         name: string; 
-         total: number; 
-         color: string;
-         subs: { name: string; total: number }[] 
-     }[] = [];
+    transactions.forEach(t => {
+        const [tY, tM] = t.occurred_on.split('-').map(Number);
+        if (tY !== selectedYear) return; // Analizziamo solo l'anno corrente per i flussi
 
-     categoryData.slice(0, 6).forEach((cat, idx) => { // Top 6 categories
-         const subsMap: Record<string, number> = {};
-         
-         // Re-scan transactions for this specific main category to find sub-breakdown
-         filteredTransactions.forEach(t => {
-            if ((t.amount_base || 0) >= 0) return;
-            
-            const c = categories.find(x => x.id === t.category_id);
-            if (!c) return;
+        const monthIdx = tM - 1;
+        const amount = t.amount_base || 0; 
+        const amountAbs = Math.abs(amount);
+        const accKind = accountTypeMap.get(t.account_id);
 
-            // Check if transaction belongs to this main category
-            let mainName = '';
-            let subName = '';
-            if (c.parent_id) {
-                const p = categories.find(x => x.id === c.parent_id);
-                mainName = p ? p.name : c.name;
-                subName = c.name;
-            } else {
-                mainName = c.name;
-                subName = 'Generale';
-            }
+        // 1. ENTRATE (Su conti di liquidità)
+        if (t.kind === 'income_personal' && (accKind === 'cash' || accKind === 'pocket')) {
+            months[monthIdx].income += amountAbs;
+            totalIncome += amountAbs;
+            lists.income.push(t);
+        }
 
-            if (mainName === cat.name) {
-                if (!subsMap[subName]) subsMap[subName] = 0;
-                subsMap[subName] += Math.abs(t.amount_base || 0);
-            }
-         });
+        // 2. USCITE FISSE
+        else if (t.kind === 'expense_essential') {
+            months[monthIdx].expenseFixed += amountAbs;
+            totalFixed += amountAbs;
+            lists.fixed.push(t);
+            const catName = categories.find(c => c.id === t.category_id)?.name || 'Fisse (Essential)';
+            categoryMap[catName] = (categoryMap[catName] || 0) + amountAbs;
+        }
+        
+        // 3. USCITE VARIABILI
+        else if (t.kind === 'expense_personal') {
+            months[monthIdx].expenseVariable += amountAbs;
+            totalVariable += amountAbs;
+            lists.variable.push(t);
+            const catName = categories.find(c => c.id === t.category_id)?.name || 'Variabili (Personal)';
+            categoryMap[catName] = (categoryMap[catName] || 0) + amountAbs;
+        }
 
-         const subs = Object.entries(subsMap)
-            .map(([n, v]) => ({ name: n, total: v }))
-            .sort((a,b) => b.total - a.total);
+        // 4. FLUSSI VERSO PATRIMONIO (Uscita da Cash/Pocket -> Entrata in Invest/Pension)
+        if (t.kind.includes('transfer') || t.kind.includes('invest') || t.kind.includes('pension')) {
+             if ((accKind === 'cash' || accKind === 'pocket') && amount < 0) {
+                 if (t.kind.includes('invest')) {
+                     flowToInvest += amountAbs;
+                     lists.invest.push(t);
+                 } else if (t.kind.includes('pension')) {
+                     flowToPension += amountAbs;
+                     lists.pension.push(t);
+                 }
+             }
+        }
+    });
 
-         list.push({
-             name: cat.name,
-             total: cat.value,
-             color: COLORS[idx % COLORS.length],
-             subs: subs
-         });
-     });
+    // Sort lists
+    Object.values(lists).forEach(l => l.sort((a,b) => new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime()));
 
-     return list;
-  }, [categoryData, filteredTransactions, categories]);
+    months.forEach(m => {
+        m.saved = m.income - (m.expenseFixed + m.expenseVariable);
+    });
 
+    const netSavings = totalIncome - (totalFixed + totalVariable); 
+    
+    // Liquidità Finale = Iniziale + Net Savings - Uscite verso Patrimonio
+    const liquidityGenerated = netSavings - flowToInvest - flowToPension;
+    const finalLiquidityCalculated = initialLiquidity + liquidityGenerated;
+    
+    const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
 
-  // --- Custom Tooltip for Charts ---
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl">
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
-             <div key={index} className="text-sm font-bold flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }}></div>
-                <span style={{ color: entry.color || entry.fill }}>
-                    {entry.name}: {entry.value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                </span>
-             </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
+    const spendingData = [
+        { name: 'Spese Fisse', value: totalFixed, color: C.fixed },
+        { name: 'Spese Variabili', value: totalVariable, color: C.variable },
+    ].filter(d => d.value > 0);
+
+    const allocationData = [
+        { name: 'Investimenti', value: flowToInvest, color: C.invest },
+        { name: 'Pensione', value: flowToPension, color: C.pension },
+        { name: 'Liquidità Rimasta', value: Math.max(0, liquidityGenerated), color: C.pocket },
+    ].filter(d => d.value > 0);
+
+    const topCategories = Object.entries(categoryMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+
+    return {
+        initialLiquidity,
+        totalIncome,
+        totalFixed, totalVariable,
+        flowToInvest, flowToPension,
+        netSavings,
+        finalLiquidityCalculated,
+        savingsRate,
+        months, spendingData, allocationData, topCategories,
+        lists
+    };
+
+  }, [transactions, selectedYear, categories, accountTypeMap]);
+
+  // --- KPI STATS (New Additions) ---
+  const kpiStats = useMemo(() => {
+      // Filtra mesi attivi per non falsare la media con mesi futuri/vuoti
+      const activeMonths = analysisData.months.filter(m => m.income > 0 || m.expenseFixed > 0 || m.expenseVariable > 0);
+      const count = activeMonths.length || 1;
+      
+      const avgSavingsRate = activeMonths.reduce((sum, m) => sum + (m.income > 0 ? (m.saved / m.income) * 100 : 0), 0) / count;
+      const avgBurn = (analysisData.totalFixed + analysisData.totalVariable) / count;
+      
+      const sortedBySavings = [...activeMonths].sort((a,b) => b.saved - a.saved);
+      const bestMonth = sortedBySavings.length > 0 ? sortedBySavings[0] : null;
+
+      const totalInvestedYear = analysisData.flowToInvest + analysisData.flowToPension;
+
+      return { avgSavingsRate, avgBurn, bestMonth, totalInvestedYear };
+  }, [analysisData]);
+
+  // --- ACTIONS ---
+  const openDrillDown = (type: keyof typeof analysisData.lists) => {
+      let title = '';
+      let color = '';
+      let total = 0;
+
+      switch(type) {
+          case 'income': title = 'Entrate'; color = 'text-emerald-600'; total = analysisData.totalIncome; break;
+          case 'fixed': title = 'Spese Fisse'; color = 'text-rose-700'; total = analysisData.totalFixed; break;
+          case 'variable': title = 'Spese Variabili'; color = 'text-rose-500'; total = analysisData.totalVariable; break;
+          case 'invest': title = 'Verso Investimenti'; color = 'text-emerald-700'; total = analysisData.flowToInvest; break;
+          case 'pension': title = 'Verso Pensione'; color = 'text-amber-600'; total = analysisData.flowToPension; break;
+      }
+      
+      setDrillState({ 
+          open: true, 
+          title, 
+          data: analysisData.lists[type], 
+          total, 
+          color 
+      });
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20 w-full overflow-hidden">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-32">
       
-       {/* Page Header */}
-      <div className="flex items-center gap-3 mb-2">
-           <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Analisi</h2>
-           <button 
-              onClick={() => setIsInfoOpen(true)}
-              className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
-           >
-               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-           </button>
-      </div>
-
-      {/* Controls Bar (Spostato SOPRA) */}
-      <div className="bg-white p-2 rounded-[1.5rem] border border-slate-200 shadow-sm w-full">
-         <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
-            {/* Year Selector Wrapper */}
-            <div className="w-full lg:w-auto overflow-x-auto no-scrollbar">
-                <div className="flex items-center space-x-2 p-1 min-w-max">
-                    {availableYears.map(y => (
-                        <button 
-                          key={y} 
-                          onClick={() => setSelectedYear(y)}
-                          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${selectedYear === y ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
-                        >
-                            {y}
-                        </button>
-                    ))}
-                </div>
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+         <div>
+            <div className="flex items-center gap-3">
+                <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Analisi {selectedYear}</h2>
+                <button onClick={() => setIsInfoOpen(true)} className="p-2 bg-white border border-slate-200 rounded-full text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </button>
             </div>
-
-            {/* Month Selector Wrapper */}
-            <div className="w-full lg:w-auto lg:border-l border-t lg:border-t-0 border-slate-100 overflow-x-auto no-scrollbar">
-                <div className="flex items-center space-x-1 p-1 min-w-max">
-                    <button 
-                        onClick={() => setSelectedMonth('all')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${selectedMonth === 'all' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}
-                    >
-                        Tutto l'anno
-                    </button>
-                    {monthNames.map((m, idx) => (
-                         <button 
-                           key={m} 
-                           onClick={() => setSelectedMonth(idx)}
-                           className={`min-w-[32px] h-8 flex items-center justify-center rounded-lg text-[10px] font-bold transition-all ${selectedMonth === idx ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
-                         >
-                            {m}
-                         </button>
-                    ))}
-                </div>
-            </div>
+            <p className="text-sm font-medium text-slate-400 mt-1">Stato Patrimoniale e Flussi.</p>
+         </div>
+         <div className="w-[120px]">
+             <CustomSelect 
+                value={String(selectedYear)} 
+                onChange={(v) => setSelectedYear(Number(v))} 
+                options={yearOptions} 
+                minimal={false} 
+             />
          </div>
       </div>
 
-      {/* --- HISTORIC WEALTH CARD (Spostato SOTTO) --- */}
-      <div className="w-full bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl shadow-slate-200 flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
-          {/* Background decoration */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
-          
-          <div className="flex items-center gap-4 relative z-10">
-              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              </div>
-              <div>
-                  <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest">Patrimonio al {historicWealth.dateLabel}</h3>
-                  <p className="text-[10px] text-slate-400 font-medium">Conti Attivi + Inv. Personali</p>
+      {/* KPI GRID (NEW) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[100px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Media SR %</span>
+              <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-black ${kpiStats.avgSavingsRate >= 20 ? 'text-emerald-500' : 'text-blue-500'}`}>{kpiStats.avgSavingsRate.toFixed(1)}</span>
+                  <span className="text-xs font-bold text-slate-300">%</span>
               </div>
           </div>
-          
-          <div className="text-center md:text-right relative z-10">
-              <span className="text-3xl md:text-4xl font-black tracking-tight text-white block">
-                  {historicWealth.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })} <span className="text-lg text-slate-500 font-bold">CHF</span>
-              </span>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[100px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Media Spese/Mese</span>
+              <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-rose-500">{formatCHF(kpiStats.avgBurn).split(',')[0]}</span>
+                  <span className="text-xs font-bold text-slate-300">CHF</span>
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[100px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Miglior Mese</span>
+              <div className="flex flex-col">
+                  {kpiStats.bestMonth ? (
+                      <>
+                        <span className="text-sm font-bold text-slate-800">{kpiStats.bestMonth.name}</span>
+                        <span className="text-xs font-black text-emerald-500">+{formatCHF(kpiStats.bestMonth.saved).split(',')[0]}</span>
+                      </>
+                  ) : <span className="text-xs text-slate-300">-</span>}
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[100px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Totale Investito (YTD)</span>
+              <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-indigo-500">{formatCHF(kpiStats.totalInvestedYear).split(',')[0]}</span>
+                  <span className="text-xs font-bold text-slate-300">CHF</span>
+              </div>
           </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entrate Nette</span>
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg></div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 mt-2 truncate">CHF {kpi.income.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
-         </div>
-         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Uscite Nette</span>
-                <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg></div>
-            </div>
-            <div className="text-2xl font-black text-rose-600 mt-2 truncate">CHF {kpi.expense.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</div>
-         </div>
-         <div className="bg-white p-5 md:p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
-             <div className="flex justify-between items-start relative z-10">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risparmio</span>
-                <span className={`text-xs font-black px-2 py-1 rounded-lg ${kpi.savingsRate >= 20 ? 'bg-emerald-100 text-emerald-700' : kpi.savingsRate > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                    {kpi.savingsRate.toFixed(1)}% Rate
-                </span>
-            </div>
-            <div className={`text-2xl font-black mt-2 relative z-10 truncate ${kpi.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {kpi.savings > 0 ? '+' : ''}CHF {kpi.savings.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-            </div>
-            
-            {/* Visual Bar Background */}
-            <div className="absolute bottom-0 left-0 h-1 bg-slate-100 w-full">
-                <div className={`h-full ${kpi.savingsRate > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(Math.abs(kpi.savingsRate), 100)}%` }}></div>
-            </div>
-         </div>
-      </div>
+      {/* CASHFLOW STATEMENT (WATERFALL) */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+              
+              {/* STEP 1: OPERATING CASHFLOW */}
+              <div className="p-6 md:p-8 space-y-6">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-slate-300"></div>
+                      1. Flusso Operativo
+                  </h3>
+                  
+                  <div className="space-y-3">
+                      <div onClick={() => openDrillDown('income')} className="flex justify-between items-center text-sm cursor-pointer group">
+                          <span className="font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Entrate Personali</span>
+                          <span className="font-bold text-emerald-600">+{formatCHF(analysisData.totalIncome)}</span>
+                      </div>
+                      <div onClick={() => openDrillDown('fixed')} className="flex justify-between items-center text-sm cursor-pointer group">
+                          <span className="font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Uscite Fisse</span>
+                          <span className="font-bold text-rose-700">-{formatCHF(analysisData.totalFixed)}</span>
+                      </div>
+                      <div onClick={() => openDrillDown('variable')} className="flex justify-between items-center text-sm cursor-pointer group">
+                          <span className="font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Uscite Variabili</span>
+                          <span className="font-bold text-rose-500">-{formatCHF(analysisData.totalVariable)}</span>
+                      </div>
+                  </div>
 
-      {/* Main Trend Chart (Only visible if 'all' months selected) */}
-      {selectedMonth === 'all' && (
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 h-[350px] md:h-[400px] flex flex-col relative w-full overflow-hidden">
-              <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-900">Andamento Annuale</h3>
-                  <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-emerald-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Entrate</span></div>
-                      <div className="flex items-center space-x-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-xs font-bold text-slate-500 hidden md:inline">Uscite</span></div>
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risparmio Netto</span>
+                      <div className="flex flex-col items-end">
+                          <span className="text-2xl font-black text-slate-900">{formatCHF(analysisData.netSavings)}</span>
+                          <span className="text-[10px] font-bold text-emerald-500">{analysisData.savingsRate.toFixed(1)}% SR</span>
+                      </div>
                   </div>
               </div>
-              <div className="flex-1 w-full min-w-0 overflow-hidden">
-                  <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={trendData} barGap={4} barSize={12} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(value) => `${value / 1000}k`} />
-                          <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                          <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} name="Entrate" />
-                          <Bar dataKey="Expense" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Uscite" />
-                      </BarChart>
-                  </ResponsiveContainer>
-              </div>
-          </div>
-      )}
 
-      {/* Breakdown Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Category Pie Chart */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] w-full overflow-hidden">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Ripartizione Spese</h3>
-              <p className="text-xs text-slate-400 mb-6">Dove sono finiti i tuoi soldi nel periodo selezionato.</p>
-              
-              <div className="flex-1 relative min-w-0 min-h-0 w-full">
-                 {categoryData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={categoryData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={80}
-                                outerRadius={110}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {categoryData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                                ))}
-                            </Pie>
-                            <RechartsTooltip content={<CustomTooltip />} />
-                        </PieChart>
-                    </ResponsiveContainer>
-                 ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-slate-300 font-bold text-sm">Nessuna spesa registrata</div>
-                 )}
-                 {/* Center Label Total */}
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Tot. Spese</span>
-                     <span className="text-xl font-black text-slate-800">CHF {kpi.expense.toLocaleString('it-IT', { notation: 'compact' })}</span>
-                 </div>
-              </div>
-          </div>
+              {/* STEP 2: RECONCILIATION */}
+              <div className="p-6 md:p-8 space-y-6 bg-slate-50/50">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      2. Variazione Liquidità
+                  </h3>
 
-          {/* Top Spending Details */}
-          <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col min-h-[400px] w-full overflow-hidden">
-              <h3 className="text-lg font-bold text-slate-900 mb-6">Dettaglio Top Categorie</h3>
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8 w-full">
-                  {topCategoriesList.length > 0 ? topCategoriesList.map((cat, idx) => {
-                      const isExpanded = expandedDetails.has(cat.name);
-                      const visibleSubs = isExpanded ? cat.subs : cat.subs.slice(0, 3);
+                  <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-slate-500">Liquidità Iniziale (Cash + Pockets)</span>
+                          <span className="font-bold text-slate-700">{formatCHF(analysisData.initialLiquidity)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm pb-2 border-b border-slate-200">
+                          <span className="font-bold text-slate-500">+ Risparmio Netto</span>
+                          <span className="font-bold text-slate-700">{formatCHF(analysisData.netSavings)}</span>
+                      </div>
                       
-                      return (
-                          <div key={idx} className="group w-full min-w-0">
-                              {/* Header Categoria */}
-                              <div className="flex justify-between items-center mb-2">
-                                  <div className="flex items-center space-x-3 truncate">
-                                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
-                                      <span className="font-bold text-sm text-slate-700 truncate">{cat.name}</span>
-                                  </div>
-                                  <span className="font-black text-sm text-slate-900 whitespace-nowrap ml-2">CHF {cat.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              
-                              {/* Progress bar visual */}
-                              <div className="w-full h-1.5 bg-slate-50 rounded-full mb-3 overflow-hidden">
-                                  <div className="h-full rounded-full" style={{ width: `${(cat.total / kpi.expense) * 100}%`, backgroundColor: cat.color }}></div>
-                              </div>
+                      <div className="pt-2 space-y-2">
+                        <div onClick={() => openDrillDown('invest')} className="flex justify-between items-center text-sm cursor-pointer group">
+                            <span className="font-bold text-slate-500 group-hover:text-blue-600 transition-colors pl-2 border-l-2 border-transparent group-hover:border-emerald-500">Verso Investimenti</span>
+                            <span className="font-bold text-emerald-700">-{formatCHF(analysisData.flowToInvest)}</span>
+                        </div>
+                        <div onClick={() => openDrillDown('pension')} className="flex justify-between items-center text-sm cursor-pointer group">
+                            <span className="font-bold text-slate-500 group-hover:text-blue-600 transition-colors pl-2 border-l-2 border-transparent group-hover:border-amber-500">Verso Pensione</span>
+                            <span className="font-bold text-amber-600">-{formatCHF(analysisData.flowToPension)}</span>
+                        </div>
+                      </div>
+                  </div>
 
-                              {/* Subcategories (Expandable) */}
-                              <div className="pl-6 space-y-1.5 animate-in fade-in duration-300">
-                                  {visibleSubs.map((sub, sIdx) => (
-                                      <div key={sIdx} className="flex justify-between items-center text-xs text-slate-400 hover:text-slate-600 transition-colors w-full">
-                                          <span className="truncate mr-2">{sub.name}</span>
-                                          <span className="font-medium whitespace-nowrap">CHF {sub.total.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</span>
-                                      </div>
-                                  ))}
-                                  
-                                  {/* Toggle Button */}
-                                  {cat.subs.length > 3 && (
-                                      <button 
-                                        onClick={() => toggleDetail(cat.name)}
-                                        className="flex items-center space-x-1 text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors mt-1 pt-1 cursor-pointer focus:outline-none"
-                                      >
-                                          <svg 
-                                            xmlns="http://www.w3.org/2000/svg" 
-                                            className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
-                                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                          >
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                                          </svg>
-                                          <span>{isExpanded ? 'Mostra meno' : `Vedi altre ${cat.subs.length - 3}`}</span>
-                                      </button>
-                                  )}
-                              </div>
+                  <div className="pt-4 border-t border-slate-200 flex justify-between items-end">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Liquidità Finale</span>
+                      <span className={`text-2xl font-black ${analysisData.finalLiquidityCalculated >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                          {formatCHF(analysisData.finalLiquidityCalculated)}
+                      </span>
+                  </div>
+              </div>
+
+          </div>
+      </div>
+
+      {/* 3. BALANCE SHEET BREAKDOWN (NEW) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* LIQUIDITY ACCOUNTS */}
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div> Liquidità (Cash & Pockets)
+                  </h3>
+                  <span className="text-xs font-black text-slate-300 uppercase">Al 31/12</span>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 max-h-[250px]">
+                  {yearEndBalances.liquidityList.map(acc => (
+                      <div key={acc.name} className="flex justify-between items-center text-sm p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex flex-col">
+                              <span className="font-bold text-slate-700">{acc.name}</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">{acc.kind}</span>
                           </div>
-                      );
-                  }) : (
-                      <div className="text-center py-20 text-slate-300 font-bold text-sm">Nessun dato disponibile</div>
+                          <span className="font-black text-slate-900">{formatCHF(acc.balance)}</span>
+                      </div>
+                  ))}
+              </div>
+              <div className="pt-4 border-t border-slate-100 mt-4 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Liquidità</span>
+                  <span className="text-lg font-black text-blue-600">{formatCHF(yearEndBalances.totalLiquidity)}</span>
+              </div>
+          </div>
+
+          {/* WEALTH ACCOUNTS */}
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Patrimonio (Invest & Pension)
+                  </h3>
+                  <span className="text-xs font-black text-slate-300 uppercase">Al 31/12</span>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 max-h-[250px]">
+                  {yearEndBalances.wealthList.map(acc => (
+                      <div key={acc.name} className="flex justify-between items-center text-sm p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex flex-col">
+                              <span className="font-bold text-slate-700">{acc.name}</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">{acc.kind}</span>
+                          </div>
+                          <span className="font-black text-slate-900">{formatCHF(acc.balance)}</span>
+                      </div>
+                  ))}
+              </div>
+              <div className="pt-4 border-t border-slate-100 mt-4 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Totale Patrimonio</span>
+                  <span className="text-lg font-black text-emerald-600">{formatCHF(yearEndBalances.totalWealth)}</span>
+              </div>
+          </div>
+      </div>
+
+      {/* 4. CHARTS: SPESE & ALLOCAZIONE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm h-[320px] flex flex-col">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-rose-500"></div> Composizione Uscite
+              </h3>
+              <div className="flex-1 flex items-center">
+                  <div className="w-1/2 h-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                              <Pie data={analysisData.spendingData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                  {analysisData.spendingData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                                  ))}
+                              </Pie>
+                              <RechartsTooltip content={<CustomTooltip />} />
+                          </PieChart>
+                      </ResponsiveContainer>
+                  </div>
+                  <div className="w-1/2 pl-4 space-y-4">
+                      <div><span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Fisse</span><span className="text-xl font-black text-rose-700 block">{formatCHF(analysisData.totalFixed)}</span></div>
+                      <div><span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Variabili</span><span className="text-xl font-black text-rose-400 block">{formatCHF(analysisData.totalVariable)}</span></div>
+                  </div>
+              </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm h-[320px] flex flex-col">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Destinazione Surplus
+              </h3>
+              <div className="flex-1 flex items-center">
+                  <div className="w-1/2 h-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                              <Pie data={analysisData.allocationData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                  {analysisData.allocationData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                                  ))}
+                              </Pie>
+                              <RechartsTooltip content={<CustomTooltip />} />
+                          </PieChart>
+                      </ResponsiveContainer>
+                  </div>
+                  <div className="w-1/2 pl-4 space-y-2 overflow-y-auto custom-scrollbar">
+                      {analysisData.allocationData.map(item => (
+                          <div key={item.name} className="flex flex-col pb-2 border-b border-slate-50 last:border-0">
+                              <span className="text-[9px] font-bold uppercase" style={{ color: item.color }}>{item.name}</span>
+                              <span className="text-sm font-black text-slate-800">{formatCHF(item.value)}</span>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {/* 5. TREND MENSILE */}
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm h-[380px] flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Trend Mensile {selectedYear}</h3>
+          </div>
+          <div className="flex-1 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analysisData.months} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+                      <Bar dataKey="expenseFixed" name="Spese Fisse" stackId="a" fill={C.fixed} radius={[0,0,0,0]} barSize={20} />
+                      <Bar dataKey="expenseVariable" name="Spese Variabili" stackId="a" fill={C.variable} radius={[4,4,0,0]} barSize={20} />
+                      <Bar dataKey="saved" name="Risparmio Netto" fill="#cbd5e1" radius={[4,4,4,4]} barSize={20} />
+                  </BarChart>
+              </ResponsiveContainer>
+          </div>
+      </div>
+
+      {/* 6. TOP SPESE & DETTAGLIO MENSILE TABLE (NEW) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Top Categorie di Spesa</h3>
+              <div className="space-y-4">
+                  {analysisData.topCategories.map((cat, idx) => (
+                      <div key={cat.name} className="relative">
+                          <div className="flex justify-between items-center mb-1.5 z-10 relative">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">{idx + 1}</div>
+                                  <span className="text-xs font-bold text-slate-700">{cat.name}</span>
+                              </div>
+                              <span className="text-xs font-black text-slate-900">{formatCHF(cat.value)} <span className="text-[9px] text-slate-400 font-normal">CHF</span></span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-50 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full" 
+                                style={{ 
+                                    width: `${(cat.value / (analysisData.totalFixed + analysisData.totalVariable)) * 100}%`,
+                                    backgroundColor: CHART_COLORS[idx % CHART_COLORS.length]
+                                }} 
+                              />
+                          </div>
+                      </div>
+                  ))}
+                  {analysisData.topCategories.length === 0 && (
+                      <div className="text-center py-8 text-slate-400 text-xs font-bold uppercase">Nessuna spesa registrata</div>
                   )}
               </div>
           </div>
+
+          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Dettaglio Mensile</h3>
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  <table className="w-full text-left border-collapse">
+                      <thead>
+                          <tr className="border-b border-slate-100 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                              <th className="py-2 pl-2">Mese</th>
+                              <th className="py-2 text-right">In</th>
+                              <th className="py-2 text-right">Out</th>
+                              <th className="py-2 text-right">Net</th>
+                              <th className="py-2 text-right pr-2">SR%</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                          {analysisData.months.map(m => {
+                              // Skip future months in table if they are 0
+                              if(m.income === 0 && m.expenseFixed === 0 && m.expenseVariable === 0) return null;
+                              
+                              const totalOut = m.expenseFixed + m.expenseVariable;
+                              const sr = m.income > 0 ? (m.saved / m.income) * 100 : 0;
+                              return (
+                                  <tr key={m.name} className="group hover:bg-slate-50 transition-colors">
+                                      <td className="py-3 pl-2 text-xs font-bold text-slate-700">{m.name}</td>
+                                      <td className="py-3 text-right text-xs font-medium text-emerald-600">+{formatCHF(m.income).split(',')[0]}</td>
+                                      <td className="py-3 text-right text-xs font-medium text-rose-600">-{formatCHF(totalOut).split(',')[0]}</td>
+                                      <td className={`py-3 text-right text-xs font-black ${m.saved >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>{formatCHF(m.saved).split(',')[0]}</td>
+                                      <td className="py-3 text-right pr-2">
+                                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${sr >= 20 ? 'bg-emerald-100 text-emerald-700' : sr > 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                              {sr.toFixed(0)}%
+                                          </span>
+                                      </td>
+                                  </tr>
+                              );
+                          })}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
       </div>
 
-      <FullScreenModal 
-        isOpen={isInfoOpen} 
-        onClose={() => setIsInfoOpen(false)} 
-        title="Report Finanziario"
-        subtitle="Help"
-      >
-        <div className="space-y-6">
-           <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-               <p className="text-sm text-indigo-800 leading-relaxed font-medium">
-                  Questa dashboard ti aiuta a capire dove vanno i tuoi soldi e quanto stai risparmiando.
-               </p>
-           </div>
+      <DrillDownModal 
+        isOpen={drillState.open}
+        onClose={() => setDrillState(prev => ({ ...prev, open: false }))}
+        title={drillState.title}
+        transactions={drillState.data}
+        total={drillState.total}
+        colorClass={drillState.color}
+      />
+
+      <FullScreenModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} title="Guida Analisi" subtitle="Dettagli & Calcoli">
+        <div className="space-y-8 pb-12">
            
+           {/* SECTION 1: KEY METRICS */}
            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Dettagli Calcoli</h4>
-              <ul className="space-y-3">
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">I movimenti classificati come <span className="font-bold text-slate-900">Work</span> (rimborsi spese) e <span className="font-bold text-slate-900">Transfer</span> (giroconti) sono <strong>esclusi</strong> da questi grafici per non falsare il calcolo delle spese nette.</p>
-                 </li>
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Il <strong>Savings Rate</strong> è calcolato come: <em className="text-slate-500">(Entrate - Uscite) / Entrate</em>.</p>
-                 </li>
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Le spese sono convertite in CHF alla data del movimento.</p>
-                 </li>
-                 <li className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5"></div>
-                    <p className="text-sm text-slate-600">Il <strong>Patrimonio Storico</strong> mostra il saldo totale di tutti i conti (attivi e non) più il valore degli <strong>investimenti personali</strong> (esclusi fondi pensione) alla data indicata, usando il tasso di cambio di quel periodo.</p>
-                 </li>
-              </ul>
+               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">1. KPI (Metriche Chiave)</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Savings Rate (SR%)</span>
+                       <p className="text-sm font-medium text-slate-700 mb-2">La percentuale di reddito risparmiato.</p>
+                       <code className="text-xs bg-white p-1 rounded border border-slate-200 block text-slate-500 font-mono">
+                           (Entrate - Uscite) / Entrate * 100
+                       </code>
+                       <p className="text-[10px] text-slate-400 mt-2 italic">Es. Entri 5.000, Spendi 3.000 -> SR 40%</p>
+                   </div>
+                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Media Spese (Burn Rate)</span>
+                       <p className="text-sm font-medium text-slate-700 mb-2">Media mensile delle uscite totali (Fisse + Variabili).</p>
+                       <code className="text-xs bg-white p-1 rounded border border-slate-200 block text-slate-500 font-mono">
+                           (Totale Fisse + Totale Variabili) / Mesi
+                       </code>
+                   </div>
+               </div>
            </div>
+
+           {/* SECTION 2: CASHFLOW */}
+           <div className="space-y-4">
+               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">2. Flusso Operativo</h4>
+               <div className="space-y-3 text-sm text-slate-600">
+                   <p>Questa sezione (riquadro in alto a sinistra) mostra il risultato netto delle tue operazioni quotidiane.</p>
+                   <ul className="space-y-2 pl-4 border-l-2 border-slate-100">
+                       <li className="flex flex-col">
+                           <span className="font-bold text-emerald-600">Entrate Personali</span>
+                           <span className="text-xs">Somma di tutte le transazioni di tipo <code>income_personal</code> accreditate su conti Cash o Pocket.</span>
+                       </li>
+                       <li className="flex flex-col">
+                           <span className="font-bold text-rose-700">Uscite Fisse</span>
+                           <span className="text-xs">Somma di tutte le transazioni di tipo <code>expense_essential</code>.</span>
+                       </li>
+                       <li className="flex flex-col">
+                           <span className="font-bold text-rose-500">Uscite Variabili</span>
+                           <span className="text-xs">Somma di tutte le transazioni di tipo <code>expense_personal</code>.</span>
+                       </li>
+                       <li className="flex flex-col mt-1 pt-1 border-t border-dashed border-slate-200">
+                           <span className="font-bold text-slate-900">Risparmio Netto (Surplus)</span>
+                           <span className="text-xs">Differenza matematica: <code className="bg-slate-50 px-1">Entrate - (Fisse + Variabili)</code>. Rappresenta la nuova liquidità generata nell'anno.</span>
+                       </li>
+                   </ul>
+               </div>
+           </div>
+
+           {/* SECTION 3: LIQUIDITY RECONCILIATION */}
+           <div className="space-y-4">
+               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">3. Variazione Liquidità</h4>
+               <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-sm text-slate-600 space-y-4">
+                   <p className="font-medium text-slate-800">
+                       Come viene calcolata la "Liquidità Finale"?
+                   </p>
+                   
+                   <div>
+                       <span className="text-xs font-bold text-slate-400 uppercase block mb-1">A. Liquidità Iniziale (Start)</span>
+                       <ul className="text-xs list-disc pl-4 space-y-1">
+                           <li><strong>Anno 2024:</strong> Somma solo i movimenti con nota esatta "Saldo Iniziale".</li>
+                           <li><strong>Anni Successivi (es. 2025):</strong> Somma matematica di TUTTI i movimenti su conti Cash/Pocket avvenuti <em>prima</em> del 1 Gennaio dell'anno selezionato. Corrisponde al saldo finale dell'anno precedente.</li>
+                       </ul>
+                   </div>
+
+                   <div>
+                       <span className="text-xs font-bold text-slate-400 uppercase block mb-1">B. Movimenti Patrimoniali (Out)</span>
+                       <p className="text-xs mb-1">Il Risparmio Netto (punto 2) non rimane tutto in cassa. Una parte viene spostata verso il patrimonio:</p>
+                       <ul className="text-xs list-disc pl-4 space-y-1">
+                           <li><strong>Verso Investimenti:</strong> Bonifici da Cash/Pocket a conti <code>invest</code>.</li>
+                           <li><strong>Verso Pensione:</strong> Bonifici da Cash/Pocket a conti <code>pension</code>.</li>
+                       </ul>
+                   </div>
+
+                   <div className="bg-white p-3 rounded-lg border border-blue-200 mt-2">
+                       <span className="text-[10px] font-bold text-blue-500 uppercase block mb-1">Formula Finale</span>
+                       <code className="text-xs font-mono font-bold text-slate-700">
+                           Liq. Finale = Iniziale + Risparmio Netto - (Investimenti + Pensione)
+                       </code>
+                   </div>
+               </div>
+           </div>
+
+           {/* SECTION 4: BALANCE SHEET */}
+           <div className="space-y-4">
+               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">4. Stato Patrimoniale</h4>
+               <div className="text-sm text-slate-600 space-y-2">
+                   <p>Questa sezione (in basso a sinistra) fotografa i saldi esatti al <strong>31 Dicembre</strong> dell'anno selezionato.</p>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                       <div className="border border-slate-200 rounded-xl p-3">
+                           <div className="flex items-center gap-2 mb-2"><div className="w-2 h-2 bg-blue-500 rounded-full"></div><span className="font-bold text-slate-800 text-xs uppercase">Liquidità</span></div>
+                           <p className="text-xs">Include tutti i conti di tipo <code>cash</code> e <code>pocket</code>. I trasferimenti interni tra questi conti non cambiano il totale, spostano solo i soldi da una tasca all'altra.</p>
+                       </div>
+                       <div className="border border-slate-200 rounded-xl p-3">
+                           <div className="flex items-center gap-2 mb-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div><span className="font-bold text-slate-800 text-xs uppercase">Patrimonio</span></div>
+                           <p className="text-xs">Include i conti <code>invest</code> e <code>pension</code>. Qui i soldi crescono (o calano) e sono considerati "bloccati" rispetto alla liquidità operativa.</p>
+                       </div>
+                   </div>
+               </div>
+           </div>
+
         </div>
       </FullScreenModal>
 
